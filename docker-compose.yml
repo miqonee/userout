@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  route-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: route-proxy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3000}
+      - ROUTER_URL=${ROUTER_URL:-https://route.fn.x3dev.ru}
+      - ROUTER_PASSWORD=${ROUTER_PASSWORD}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123456}
+      - DATA_DIR=/app/data
+      - COOKIE_SECRET=${COOKIE_SECRET:-route-proxy-secure-session-key-32chars}
+    volumes:
+      - route-data:/app/data
+    networks:
+      - route-network
+
+volumes:
+  route-data:
+    name: route-data
+
+networks:
+  route-network:
+    driver: bridge
