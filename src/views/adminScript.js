@@ -13,8 +13,7 @@ export function initAdminDashboard({ clients, adminApi, publicUrl }) {
   const depleted = (c) => c.status === 'depleted' || (c.tokenLimit > 0 && c.usedTokens >= c.tokenLimit);
 
   function invitation(client) {
-    const limit = client.tokenLimit === 0 ? 'Без лимита' : fmt(client.tokenLimit) + ' токенов';
-    return ['Здравствуйте!', '', 'Ваш персональный доступ к AI готов.', 'Пакет: ' + limit, '', 'Ключ и инструкция по подключению в личном кабинете:', client.portalUrl, '', 'Приятной работы!'].join('\n');
+    return ['Ваш дашборд для отслеживания расхода и инструкции:', client.portalUrl].join('\n');
   }
   async function copyOrSelect(text, area = null) {
     if (await copyText(text)) return true;
