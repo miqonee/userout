@@ -5,7 +5,7 @@ import { renderAdminDashboardHtml } from '../src/views/adminHtml.js';
 
 // Minimal event-driven DOM fixture; execute the actual rendered script, not a
 // second implementation of the invitation format or selection state.
-function dashboardFixture(portals) {
+function dashboardFixture(portals, publicUrl = 'https://gateway.example') {
   const nodes = new Map();
   const makeNode = () => ({
     listeners: {}, children: new Map(), dataset: {}, style: {}, value: '', hidden: false,
@@ -62,7 +62,7 @@ function dashboardFixture(portals) {
       await Promise.resolve();
     },
   };
-  const html = renderAdminDashboardHtml({ portals, publicUrl: 'https://gateway.example' });
+  const html = renderAdminDashboardHtml({ portals, publicUrl });
   for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
     runInNewContext(match[1], {
       document, Intl, setTimeout: () => 0, clearTimeout() {},
@@ -88,14 +88,19 @@ test('rendered FunPay script produces one physical line per key and reuses the T
   await f.get('exportSelected').emit('click');
   const lines = f.get('funpayTextarea').value.split('\n');
   assert.equal(lines.length, 2);
-  assert.ok(lines[0].includes('\\n'));
-  assert.ok(lines[0].includes('/p/test-1'));
-  assert.ok(lines[1].includes('/p/test-2'));
+  assert.equal(lines[0], 'API Key: sk-test-1\\nBase URL: https://gateway.example/v1\\nЛичный кабинет (расход и инструкции): https://gateway.example/p/test-1');
+  assert.equal(lines[1], 'API Key: sk-test-2\\nBase URL: https://gateway.example/v1\\nЛичный кабинет (расход и инструкции): https://gateway.example/p/test-2');
   assert.match(f.get('funpayCount').textContent, /Исключено исчерпанных: 1/);
   await f.get('funpayDialog').close();
   assert.equal(f.reloads, 0);
   await f.action(1, 'telegram');
   assert.equal(f.copied[0], lines[0].replaceAll('\\n', '\n'));
+});
+
+test('invitations normalize the base URL and copy the complete API key', async () => {
+  const f = dashboardFixture(samples, 'https://gateway.example///');
+  await f.action(1, 'telegram');
+  assert.equal(f.copied[0], 'API Key: sk-test-1\nBase URL: https://gateway.example/v1\nЛичный кабинет (расход и инструкции): https://gateway.example/p/test-1');
 });
 test('selection is indeterminate, selects only found rows, and resets on a search change', async () => {
   const f = dashboardFixture(samples);
@@ -146,6 +151,7 @@ test('full and partial batch creation offer only new invitations and reload afte
     assert.equal(f.get('funpayDialog').open, true);
     assert.equal(f.get('funpayTextarea').value.split('\n').length, created.length);
     assert.ok(f.get('funpayTextarea').value.includes('/p/new-1'));
+    assert.equal(f.get('funpayTextarea').value.split('\n')[0], 'API Key: sk-test-1\\nBase URL: https://gateway.example/v1\\nЛичный кабинет (расход и инструкции): https://gateway.example/p/new-1');
     assert.ok(!f.get('funpayTextarea').value.includes('/p/test-1'));
     assert.equal(f.get('batchResult').hidden, !partial);
     assert.equal(calls, 1);

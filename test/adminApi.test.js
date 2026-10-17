@@ -78,6 +78,14 @@ test('admin key operations against an isolated upstream and database', async (t)
     }
     assert.equal(deleteCalls.length, 0);
   });
+  await t.test('new API records return short addresses usable by portal and status routes', async () => {
+    const [portal] = await create();
+    assert.match(portal.portalToken, /^[A-Za-z0-9_-]{10}$/);
+    const page = await fastify.inject('/p/' + portal.portalToken);
+    assert.equal(page.statusCode, 200);
+    assert.ok(page.body.includes(portal.apiKey));
+    assert.equal((await fastify.inject('/api/portal/' + portal.portalToken + '/status')).statusCode, 200);
+  });
   await t.test('partial deletion preserves failures and retries do not revoke successful keys again', async () => {
     const [a, b] = await create(2);
     failDelete.add(b.keyId);

@@ -231,8 +231,10 @@ test("model normalization strips ag/ for user facing displays and restores it fo
 
 test("admin dashboard includes FunPay auto-delivery export, bonus dialog and clean telegram message", () => {
   const dashboard = renderAdminDashboardHtml({ portals: [portal], publicUrl: portal.publicUrl });
-  // Telegram copy produces concise dashboard and instructions link
-  assert.ok(dashboard.includes("'Ссылка на дашборд для отслеживания расхода и инструкции:'"));
+  // Telegram copy includes credentials and the personal dashboard link.
+  assert.ok(dashboard.includes("'API Key: ' + client.apiKey"));
+  assert.ok(dashboard.includes("'Base URL: ' + publicUrl + '/v1'"));
+  assert.ok(dashboard.includes("'Личный кабинет (расход и инструкции): ' + client.portalUrl"));
   assert.ok(!dashboard.includes("'Здравствуйте, ' + client.clientName"));
 
   // FunPay dialog

@@ -15,6 +15,7 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS portals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   portal_token TEXT UNIQUE NOT NULL,
+  short_token TEXT,
   client_name TEXT NOT NULL,
   key_id TEXT NOT NULL,
   api_key TEXT UNIQUE NOT NULL,
@@ -32,7 +33,28 @@ CREATE INDEX IF NOT EXISTS idx_portals_status ON portals(status);
 `);
 
 export function generatePortalToken() {
-  return crypto.randomBytes(16).toString("hex");
+  let token;
+  do {
+    token = crypto.randomBytes(8).toString("base64url").slice(0, 10);
+  } while (db.prepare("SELECT 1 FROM portals WHERE portal_token = ? OR short_token = ?").get(token, token));
+  return token;
+}
+
+// Give existing portals a stable short address while retaining the original
+// token as an alias for links already delivered to customers.
+db.exec("BEGIN IMMEDIATE");
+try {
+  if (!db.prepare("PRAGMA table_info(portals)").all().some((column) => column.name === "short_token")) {
+    db.exec("ALTER TABLE portals ADD COLUMN short_token TEXT");
+  }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_portals_short_token ON portals(short_token)");
+  const legacy = db.prepare("SELECT id FROM portals WHERE length(portal_token) > 10 AND short_token IS NULL").all();
+  const setShortToken = db.prepare("UPDATE portals SET short_token = ? WHERE id = ?");
+  for (const portal of legacy) setShortToken.run(generatePortalToken(), portal.id);
+  db.exec("COMMIT");
+} catch (err) {
+  db.exec("ROLLBACK");
+  throw err;
 }
 
 export function createPortalRecord({
@@ -44,6 +66,7 @@ export function createPortalRecord({
   allowedModels = null,
 }) {
   const token = portalToken || generatePortalToken();
+  if (portalToken && getPortalByToken(token)) throw new Error("Portal token already exists");
   const now = new Date().toISOString();
   const modelsJson = Array.isArray(allowedModels) ? JSON.stringify(allowedModels) : null;
 
@@ -72,7 +95,7 @@ function parsePortalRow(row) {
 
   return {
     id: row.id,
-    portalToken: row.portal_token,
+    portalToken: row.short_token || row.portal_token,
     clientName: row.client_name,
     keyId: row.key_id,
     apiKey: row.api_key,
@@ -91,7 +114,7 @@ export function getPortalById(id) {
 }
 
 export function getPortalByToken(token) {
-  const row = db.prepare("SELECT * FROM portals WHERE portal_token = ?").get(token);
+  const row = db.prepare("SELECT * FROM portals WHERE portal_token = ? OR short_token = ?").get(token, token);
   return parsePortalRow(row);
 }
 
