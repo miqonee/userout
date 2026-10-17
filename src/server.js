@@ -3,8 +3,11 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import formbody from "@fastify/formbody";
 import { config } from "./config.js";
+import { formatNum } from "./format.js";
 import { handleProxyRequest } from "./proxy.js";
 import { routerClient } from "./services/routerClient.js";
+import { resolvePortalModels } from "./services/portalModels.js";
+import { AdminAuth } from "./services/adminAuth.js";
 import {
   getAllPortals,
   getPortalByToken,
@@ -12,11 +15,13 @@ import {
   createPortalRecord,
   deletePortalRecord,
   updatePortalUsage,
+  db,
 } from "./db.js";
-import { renderPortalHtml } from "./views/portalHtml.js";
+import { renderPortalHtml, renderMissingPortalHtml } from "./views/portalHtml.js";
 import { renderAdminLoginHtml, renderAdminDashboardHtml } from "./views/adminHtml.js";
 
 const fastify = Fastify({
+  trustProxy: config.trustProxy,
   logger: {
     level: process.env.NODE_ENV === "production" ? "info" : "debug",
   },
@@ -39,10 +44,11 @@ fastify.addContentTypeParser("*", (req, payload, done) => {
 });
 
 // Admin authentication middleware helper
-function isAdminAuthenticated(req) {
-  const session = req.cookies.admin_session;
-  return session === config.cookieSecret;
-}
+const adminAuth = new AdminAuth({ db, password: config.adminPassword });
+const adminPath = config.adminPath;
+const adminOptions = { adminPath };
+const adminCookie = { path: adminPath, httpOnly: true, sameSite: "strict", secure: config.publicUrl.startsWith("https://") };
+function isAdminAuthenticated(req) { return adminAuth.authenticate(req.cookies.admin_session); }
 
 // ----------------------------------------------------
 // 1. REVERSE PROXY ROUTE: /v1/*
@@ -53,25 +59,33 @@ fastify.all("/v1/*", handleProxyRequest);
 // ----------------------------------------------------
 // 2. CLIENT PERSONAL PORTAL: /p/:token
 // ----------------------------------------------------
+fastify.addHook("onRequest", async (req, reply) => {
+  if (req.url.startsWith("/p/") || req.url.startsWith("/api/portal/") || req.url.split("?")[0] === adminPath || req.url.startsWith(adminPath + "/")) {
+    reply.header("X-Robots-Tag", "noindex, nofollow, noarchive");
+    reply.header("Cache-Control", "private, no-store, max-age=0");
+    reply.header("Pragma", "no-cache");
+    reply.header("Referrer-Policy", "no-referrer");
+  }
+});
+
 fastify.get("/p/:token", async (req, reply) => {
   const { token } = req.params;
   const portal = getPortalByToken(token);
 
   if (!portal) {
-    return reply.status(404).type("text/html").send(`
-      <!DOCTYPE html><html><body style="background:#080c14;color:#94a3b8;font-family:sans-serif;display:flex;height:100vh;align-items:center;justify-content:center">
-      <div style="text-align:center"><h2>404 — Ссылка не найдена</h2><p>Персональная страница аннулирована или не существует.</p></div></body></html>
-    `);
+    return reply.status(404).type("text/html").send(renderMissingPortalHtml());
   }
 
   // Live sync with 9router if active
   let usedTokens = portal.cachedUsedTokens;
+  let allowedModels = portal.allowedModels;
   let isDepleted = portal.status === "depleted" || (portal.tokenLimit > 0 && usedTokens >= portal.tokenLimit);
 
   if (!isDepleted) {
     try {
       const keyInfo = await routerClient.getKey(portal.keyId);
       if (keyInfo) {
+        if (keyInfo.allowedModels === null || Array.isArray(keyInfo.allowedModels)) allowedModels = keyInfo.allowedModels;
         usedTokens = Number(keyInfo.usedTokens) || 0;
         if (portal.tokenLimit > 0 && usedTokens >= portal.tokenLimit) {
           isDepleted = true;
@@ -85,18 +99,28 @@ fastify.get("/p/:token", async (req, reply) => {
     }
   }
 
+  let availableModels = [];
+  if (!isDepleted) {
+    try {
+      availableModels = await resolvePortalModels(allowedModels, () => routerClient.getModelsForKey(portal.apiKey));
+    } catch (err) {
+      req.log.warn({ err }, "Could not load models for client instructions");
+    }
+  }
+
   const html = renderPortalHtml({
     clientName: portal.clientName,
     portalToken: portal.portalToken,
     apiKey: portal.apiKey,
     tokenLimit: portal.tokenLimit,
     usedTokens,
-    allowedModels: portal.allowedModels,
+    allowedModels,
+    availableModels,
     publicUrl: config.publicUrl,
     isDepleted,
   });
 
-  return reply.type("text/html").send(html);
+  return reply.status(isDepleted ? 410 : 200).type("text/html").send(html);
 });
 
 // Portal real-time status check endpoint
@@ -128,12 +152,6 @@ fastify.get("/api/portal/:token/status", async (req, reply) => {
   const remainingTokens = Math.max(0, portal.tokenLimit - usedTokens);
   const percentUsed = portal.tokenLimit > 0 ? Math.min(100, Math.round((usedTokens / portal.tokenLimit) * 100)) : 0;
 
-  const formatNum = (n) => {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(2).replace(/\.00$/, "") + " млн";
-    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + " тыс";
-    return n.toLocaleString();
-  };
-
   return reply.send({
     isDepleted,
     percentUsed,
@@ -147,11 +165,11 @@ fastify.get("/api/portal/:token/status", async (req, reply) => {
 });
 
 // ----------------------------------------------------
-// 3. ADMIN PANEL: /admin
+// 3. ADMIN PANEL: installation-specific path
 // ----------------------------------------------------
-fastify.get("/admin", async (req, reply) => {
+fastify.get(adminPath, async (req, reply) => {
   if (!isAdminAuthenticated(req)) {
-    return reply.type("text/html").send(renderAdminLoginHtml());
+    return reply.type("text/html").send(renderAdminLoginHtml(null, adminOptions));
   }
 
   // Fetch portals and available models
@@ -195,33 +213,46 @@ fastify.get("/admin", async (req, reply) => {
     availableModels,
     publicUrl: config.publicUrl,
     stats,
+    adminPath,
   });
 
   return reply.type("text/html").send(html);
 });
 
-fastify.post("/admin/login", async (req, reply) => {
+function blockedLogin(reply, retryAfter) {
+  return reply.code(429).header("Retry-After", String(retryAfter)).type("text/html")
+    .send(renderAdminLoginHtml(`Слишком много попыток. Повторите вход через ${Math.ceil(retryAfter / 60)} мин.`, adminOptions));
+}
+
+fastify.post(adminPath + "/login", {
+  bodyLimit: 4096,
+  onRequest: async (req, reply) => {
+    const wait = adminAuth.retryAfter(req.ip);
+    if (wait) return blockedLogin(reply, wait);
+  },
+}, async (req, reply) => {
   const { password } = req.body || {};
-  if (password === config.adminPassword) {
-    reply.setCookie("admin_session", config.cookieSecret, {
-      path: "/",
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      sameSite: "lax",
-    });
-    return reply.redirect("/admin");
+  const result = adminAuth.login(req.ip, password);
+  if (result.status === "blocked") return blockedLogin(reply, result.retryAfter);
+  if (result.status === "unconfigured") {
+    return reply.code(503).type("text/html").send(renderAdminLoginHtml("Вход не настроен. Задайте ADMIN_PASSWORD на сервере.", adminOptions));
+  }
+  if (result.status === "ok") {
+    reply.setCookie("admin_session", result.token, { ...adminCookie, maxAge: result.maxAge });
+    return reply.redirect(adminPath);
   }
 
-  return reply.type("text/html").send(renderAdminLoginHtml("Неверный мастер-пароль"));
+  return reply.code(401).type("text/html").send(renderAdminLoginHtml("Неверный пароль", adminOptions));
 });
 
-fastify.get("/admin/logout", async (req, reply) => {
-  reply.clearCookie("admin_session", { path: "/" });
-  return reply.redirect("/admin");
+fastify.get(adminPath + "/logout", async (req, reply) => {
+  adminAuth.logout(req.cookies.admin_session);
+  reply.clearCookie("admin_session", adminCookie);
+  return reply.redirect(adminPath);
 });
 
 // Admin API: Batch Create Keys
-fastify.post("/api/admin/keys/batch-create", async (req, reply) => {
+fastify.post(adminPath + "/api/keys/batch-create", async (req, reply) => {
   if (!isAdminAuthenticated(req)) {
     return reply.status(401).send({ error: "Unauthorized" });
   }
@@ -265,7 +296,7 @@ fastify.post("/api/admin/keys/batch-create", async (req, reply) => {
 });
 
 // Admin API: Delete Key
-fastify.delete("/api/admin/keys/:id", async (req, reply) => {
+fastify.delete(adminPath + "/api/keys/:id", async (req, reply) => {
   if (!isAdminAuthenticated(req)) {
     return reply.status(401).send({ error: "Unauthorized" });
   }
@@ -286,21 +317,17 @@ fastify.delete("/api/admin/keys/:id", async (req, reply) => {
   return reply.send({ success: true });
 });
 
-// Root redirect
-fastify.get("/", async (req, reply) => {
-  return reply.redirect("/admin");
-});
+// Public health check for Docker; it does not disclose the administration path.
+fastify.get("/health", async () => ({ status: "ok" }));
+
+// The public root and old admin URLs must not disclose the administration path.
 
 // Start server
 const start = async () => {
   try {
     await fastify.listen({ port: config.port, host: config.host });
-    console.log(`\n=================================================`);
-    console.log(`  🚀 Route Proxy & Client Portal Running!`);
-    console.log(`  - Local:    http://localhost:${config.port}`);
-    console.log(`  - Admin:    http://localhost:${config.port}/admin`);
-    console.log(`  - Upstream: ${config.routerUrl}`);
-    console.log(`=================================================\n`);
+    fastify.log.info({ adminUrl: `${config.publicUrl}${adminPath}` }, "Administration URL");
+    if (!config.adminPassword) fastify.log.warn("Admin login disabled: set ADMIN_PASSWORD");
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

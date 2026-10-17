@@ -6,7 +6,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "preview": "node scripts/preview.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",

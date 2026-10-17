@@ -1,357 +1,178 @@
-export function renderAdminLoginHtml(error = null) {
-  return `<!DOCTYPE html>
-<html lang="ru" class="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Вход в панель управления — Route</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { background-color: #080c14; font-family: system-ui, -apple-system, sans-serif; }
-    .glass-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
-    .glass-input { background: rgba(3, 7, 18, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); }
-  </style>
-</head>
-<body class="min-h-screen text-slate-100 flex items-center justify-center p-4">
-  <div class="max-w-md w-full glass-card rounded-2xl p-8 shadow-2xl space-y-6">
-    <div class="text-center">
-      <div class="w-12 h-12 bg-indigo-600/20 text-indigo-400 rounded-xl flex items-center justify-center mx-auto mb-3 border border-indigo-500/30">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-      </div>
-      <h1 class="text-2xl font-bold text-white tracking-tight">Админ-панель Route</h1>
-      <p class="text-slate-400 text-xs mt-1">Управление клиентами, ключами и квотами</p>
-    </div>
+import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, sidebar, toast } from "./ui.js";
 
-    ${
-      error
-        ? `<div class="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3.5 py-2.5 rounded-xl text-center">${error}</div>`
-        : ""
-    }
-
-    <form method="POST" action="/admin/login" class="space-y-4">
-      <div>
-        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Мастер-пароль</label>
-        <input type="password" name="password" required autofocus class="glass-input text-sm text-slate-200 px-3.5 py-2.5 rounded-xl w-full focus:outline-none focus:border-indigo-500 transition">
-      </div>
-      <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition shadow-lg shadow-indigo-600/30">
-        Войти
-      </button>
-    </form>
-  </div>
-</body>
-</html>`;
+function dialogHeading(title, description) {
+  return `<div class="dialog-heading"><div><h2>${title}</h2><p>${description}</p></div><button type="button" class="icon-button" data-close aria-label="Закрыть окно">${icon("close")}</button></div>`;
 }
 
-export function renderAdminDashboardHtml({
-  portals = [],
-  availableModels = [],
-  publicUrl,
-  stats = { totalLimit: 0, totalUsed: 0, activeCount: 0, totalCount: 0 },
-}) {
-  const formatNum = (n) => {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(2).replace(/\.00$/, "") + "M";
-    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
-    return n.toLocaleString();
-  };
+function metricNumber(value) {
+  return formatNum(value).replace(/ (млн|тыс\.)$/, ' <span class="metric-unit">$1</span>');
+}
 
-  return `<!DOCTYPE html>
-<html lang="ru" class="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Управление ключами — Route Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { background-color: #080c14; font-family: system-ui, -apple-system, sans-serif; }
-    .glass-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
-    .glass-input { background: rgba(3, 7, 18, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); }
-  </style>
-</head>
-<body class="min-h-screen text-slate-100 p-4 md:p-8 flex flex-col items-center">
-  <div class="max-w-6xl w-full space-y-8">
+export function renderAdminLoginHtml(error = null, { adminPath = "/manage-console" } = {}) {
+  return `${head("Вход в панель управления", { privatePage: true })}<body class="login-page">
+    <section class="login-brand-panel" aria-label="Route — AI Gateway">
+      ${brand()}
+      <div class="login-editorial"><h1>Управление<br><span>доступом.</span></h1><p>Клиенты, ключи и квоты.</p>
+        <div class="route-diagram" aria-hidden="true"><span class="diagram-node">${icon("terminal")}</span><span class="diagram-line"></span><span class="diagram-node hub">${icon("key")}</span><span class="diagram-line"></span><span class="diagram-node">${icon("layers")}</span></div>
+      </div><div class="login-footer"><span>Route Proxy Gateway</span><span>Панель управления</span></div>
+    </section>
+    <main class="login-panel"><div class="login-form-wrap"><h2>Вход</h2>
+      ${error ? `<div class="notice notice-error" role="alert">${esc(error)}</div>` : ""}
+      <form method="POST" action="${esc(adminPath)}/login"><label class="field-label" for="password">Пароль</label><input class="input" type="password" id="password" name="password" autocomplete="current-password" placeholder="Введите пароль" required maxlength="1024" autofocus><button class="btn btn-dark" type="submit">Войти ${icon("arrow")}</button></form>
+      <div class="login-note">${icon("lock")}Доступ только для администратора</div>
+    </div></main></body></html>`;
+}
 
-    <!-- Top Bar -->
-    <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center border border-indigo-500/30 font-bold">
-          R
-        </div>
-        <div>
-          <h1 class="text-xl font-bold text-white tracking-tight">Route Proxy &bull; Админ-панель</h1>
-          <p class="text-xs text-slate-500">Шлюз для продажи токенов 9router</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <a href="/admin/logout" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition">
-          Выйти
-        </a>
-      </div>
-    </div>
+export function renderAdminDashboardHtml({ portals = [], availableModels = [], publicUrl, adminPath = "/manage-console", stats = { totalLimit: 0, totalUsed: 0, activeCount: 0, totalCount: 0 } }) {
+  const totalRemaining = portals.filter((p) => p.tokenLimit > 0).reduce((sum, p) => sum + Math.max(0, p.tokenLimit - p.cachedUsedTokens), 0);
+  const unlimitedCount = portals.filter((p) => p.tokenLimit === 0).length;
+  const usedPercent = stats.totalLimit > 0 ? Math.min(100, Math.round(stats.totalUsed / stats.totalLimit * 100)) : 0;
+  const rootUrl = String(publicUrl || "").replace(/\/+$/, "");
+  const rows = portals.map((p) => {
+    const unlimited = p.tokenLimit === 0;
+    const percent = unlimited ? 0 : Math.min(100, Math.max(0, Math.round(p.cachedUsedTokens / p.tokenLimit * 100)));
+    const depleted = p.status === "depleted" || (!unlimited && p.cachedUsedTokens >= p.tokenLimit);
+    const status = depleted ? "depleted" : "active";
+    const initials = p.clientName.trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "К";
+    const portalUrl = `${rootUrl}/p/${encodeURIComponent(p.portalToken)}`;
+    return `<tr class="client-row" data-status="${status}" data-name="${esc(p.clientName.toLocaleLowerCase("ru"))}" data-id="${esc(p.id)}">
+      <td><div class="client-identity"><span class="client-avatar" aria-hidden="true">${esc(initials)}</span><div><div class="client-name" title="${esc(p.clientName)}">${esc(p.clientName)}</div><div class="client-key">${esc(p.apiKey.slice(0, 12))}••••</div></div></div></td>
+      <td><span class="usage-value">${formatNum(p.cachedUsedTokens)} <span>/ ${unlimited ? "∞" : formatNum(p.tokenLimit)}</span></span><div class="mini-meter ${depleted ? "is-depleted" : percent >= 80 ? "is-warning" : ""}" role="meter" aria-label="Квота ${esc(p.clientName)}" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${unlimited ? "Без лимита" : `${percent}% использовано`}"><span style="width:${percent}%"></span></div></td>
+      <td><span class="badge ${depleted ? "is-depleted" : ""}"><span class="dot"></span>${depleted ? "Исчерпан" : "Активен"}</span></td>
+      <td><a class="table-link" href="${esc(portalUrl)}" target="_blank" rel="noopener noreferrer">Личный кабинет ${icon("external")}</a></td>
+      <td><div class="table-actions"><button class="icon-button" data-action="link" title="Скопировать ссылку" aria-label="Скопировать ссылку: ${esc(p.clientName)}">${icon("copy")}</button><button class="icon-button" data-action="telegram" title="Скопировать сообщение для Telegram" aria-label="Сообщение для Telegram: ${esc(p.clientName)}">${icon("send")}</button><button class="icon-button danger" data-action="delete" title="Удалить ключ" aria-label="Удалить ключ: ${esc(p.clientName)}">${icon("trash")}</button></div></td>
+    </tr>`;
+  }).join("");
+  const clientData = portals.map(({ id, clientName, portalToken, tokenLimit }) => ({ id, clientName, portalUrl: `${rootUrl}/p/${encodeURIComponent(portalToken)}`, tokenLimit }));
 
-    <!-- Quick Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="glass-card rounded-xl p-4 shadow-sm">
-        <div class="text-xs text-slate-400 uppercase font-medium mb-1">Всего клиентов</div>
-        <div class="text-2xl font-bold text-white">${stats.totalCount}</div>
-      </div>
-      <div class="glass-card rounded-xl p-4 shadow-sm">
-        <div class="text-xs text-slate-400 uppercase font-medium mb-1">Активных</div>
-        <div class="text-2xl font-bold text-emerald-400">${stats.activeCount}</div>
-      </div>
-      <div class="glass-card rounded-xl p-4 shadow-sm">
-        <div class="text-xs text-slate-400 uppercase font-medium mb-1">Выделено токенов</div>
-        <div class="text-2xl font-bold text-indigo-300">${formatNum(stats.totalLimit)}</div>
-      </div>
-      <div class="glass-card rounded-xl p-4 shadow-sm">
-        <div class="text-xs text-slate-400 uppercase font-medium mb-1">Израсходовано</div>
-        <div class="text-2xl font-bold text-amber-400">${formatNum(stats.totalUsed)}</div>
-      </div>
-    </div>
+  return `${head("Обзор рабочего пространства", { privatePage: true })}<body><div class="app-shell">
+    ${sidebar({ adminPath })}
+    <main class="main" id="overview">
+      <header class="topbar"><div class="breadcrumb">Рабочее пространство <span>/</span> <strong>Обзор</strong></div><div class="topbar-meta"><span class="tag">AI GATEWAY</span><span class="user-avatar" style="color:#65715f;border-color:#dce3d5;width:29px;height:29px">A</span><a class="icon-button" href="${esc(adminPath)}/logout" aria-label="Выйти" title="Выйти">${icon("logout")}</a></div></header>
+      <section class="page-heading"><div><h1>Обзор пространства</h1><p class="subtitle">Клиенты, ключи и использование токенов.</p></div><div class="heading-actions"><button class="btn" id="refreshDashboard">${icon("refresh")}Обновить</button><button class="btn btn-primary" data-open="newKeyDialog">${icon("plus")}Новый ключ</button></div></section>
+      <section class="metrics" aria-label="Сводка по клиентам">
+        <article class="metric"><div class="metric-label">Всего клиентов ${icon("grid")}</div><div class="metric-number">${formatNum(stats.totalCount)}</div><div class="metric-foot">В вашем пространстве</div></article>
+        <article class="metric"><div class="metric-label">Активные ключи ${icon("key")}</div><div class="metric-number">${formatNum(stats.activeCount)}</div><div class="metric-foot"><span class="dot" style="color:#739b64"></span>Готовы к работе</div></article>
+        <article class="metric"><div class="metric-label">Использовано токенов ${icon("layers")}</div><div class="metric-number">${metricNumber(stats.totalUsed)}</div><div class="metric-foot">${unlimitedCount ? `Есть ключи без лимита: ${unlimitedCount}` : `${usedPercent}% от общей квоты`}</div></article>
+        <article class="metric metric-accent"><div class="metric-label">Остаток общей квоты ${icon("plug")}</div><div class="metric-number">${metricNumber(totalRemaining)}</div><div class="metric-foot">${unlimitedCount ? "Для ключей с лимитом" : `Из ${formatNum(stats.totalLimit)} выделенных`}</div></article>
+      </section>
+      <section class="panel" id="clients" aria-labelledby="clientsTitle">
+        <div class="panel-header"><div><h2 id="clientsTitle">Клиенты и ключи <span class="count">${portals.length}</span></h2><p class="panel-description">Доступ, персональные ссылки и расход токенов.</p></div><button class="icon-button" data-open="newKeyDialog" aria-label="Добавить клиента" title="Добавить клиента">${icon("plus")}</button></div>
+        <div class="client-toolbar"><div class="search-field">${icon("search")}<input id="clientSearch" type="search" placeholder="Найти клиента…" aria-label="Поиск по имени клиента" autocomplete="off"></div><div class="filter-tabs" role="group" aria-label="Фильтр по статусу"><button class="filter-tab" data-filter="all" aria-pressed="true">Все клиенты</button><button class="filter-tab" data-filter="active" aria-pressed="false">Активные</button><button class="filter-tab" data-filter="depleted" aria-pressed="false">Исчерпанные</button></div></div>
+        <div class="table-scroll"><table><thead><tr><th scope="col">Клиент</th><th scope="col">Расход / квота</th><th scope="col">Статус</th><th scope="col">Персональный доступ</th><th scope="col" style="text-align:right">Действия</th></tr></thead><tbody id="portalsTableBody">${rows}<tr id="emptyRow" ${portals.length ? "hidden" : ""}><td colspan="5"><div class="empty-state"><div class="empty-icon">${icon("key")}</div><h3 id="emptyTitle">Клиентов пока нет</h3><p id="emptyDescription">Создайте ключ для клиента.</p><button class="btn btn-primary" data-open="newKeyDialog" id="emptyCreate">${icon("plus")}Создать первый ключ</button></div></td></tr></tbody></table></div>
+        <div class="table-footer"><span id="resultCount" aria-live="polite">Показано ${portals.length} из ${portals.length}</span><span>Актуальный расход — при обновлении страницы</span></div>
+      </section>
+      <section class="support-strip"><div>${icon("plug")}<div><h3>Параметры шлюза</h3><p>Адрес шлюза для клиентских приложений и SDK.</p></div></div><button class="btn" data-open="connectionDialog">Параметры подключения ${icon("arrow")}</button></section>
+      <footer class="page-footer"><span class="footer-brand">route.</span></footer>
+    </main></div>
 
-    <!-- Create Keys Section (Batch Generator) -->
-    <div class="glass-card rounded-2xl p-6 shadow-xl space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
-        <div>
-          <h2 class="text-base font-semibold text-white">Выпуск новых ключей</h2>
-          <p class="text-xs text-slate-400">Создает ключ в 9router и формирует персональную страницу</p>
-        </div>
-      </div>
-
-      <form id="createKeyForm" onsubmit="handleCreateKey(event)" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <!-- Client Name -->
-          <div>
-            <label class="block text-xs text-slate-400 mb-1 font-medium">Имя покупателя / Заметка</label>
-            <input type="text" id="clientName" required placeholder="Например: Ivan (Cursor)" class="glass-input text-xs text-slate-200 px-3.5 py-2.5 rounded-xl w-full focus:outline-none focus:border-indigo-500">
-          </div>
-
-          <!-- Token Limit Preset -->
-          <div>
-            <label class="block text-xs text-slate-400 mb-1 font-medium">Лимит токенов</label>
-            <div class="flex gap-1.5 mb-1.5">
-              <button type="button" onclick="setPresetLimit(10000000)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md border border-slate-700">10M</button>
-              <button type="button" onclick="setPresetLimit(50000000)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md border border-slate-700">50M</button>
-              <button type="button" onclick="setPresetLimit(100000000)" class="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md border border-slate-700">100M</button>
-            </div>
-            <input type="number" id="tokenLimit" required value="10000000" min="1000" step="1000" class="glass-input text-xs font-mono text-slate-200 px-3.5 py-2 rounded-xl w-full focus:outline-none">
-          </div>
-
-          <!-- Batch Count -->
-          <div>
-            <label class="block text-xs text-slate-400 mb-1 font-medium">Количество ключей</label>
-            <select id="batchCount" class="glass-input text-xs text-slate-200 px-3.5 py-2.5 rounded-xl w-full focus:outline-none">
-              <option value="1">1 ключ</option>
-              <option value="3">3 ключа</option>
-              <option value="5">5 ключей</option>
-              <option value="10">10 ключей</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Model Restrictions -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs text-slate-400 font-medium">Разрешенные модели для этого ключа</label>
-            <label class="flex items-center gap-1.5 text-xs text-indigo-400 cursor-pointer">
-              <input type="checkbox" id="allModelsCheck" checked onchange="toggleAllModels(this.checked)" class="rounded text-indigo-600 bg-slate-900 border-slate-700">
-              <span>Все доступные модели (*)</span>
-            </label>
-          </div>
-
-          <div id="modelsSelectorBox" class="hidden bg-slate-950/60 border border-slate-800 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1.5">
-            ${
-              availableModels.map((m) => `
-                <label class="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none">
-                  <input type="checkbox" name="models" value="${m.id}" class="model-checkbox rounded text-indigo-600 bg-slate-900 border-slate-700">
-                  <span class="font-mono text-[11px] text-indigo-300">${m.id}</span>
-                </label>
-              `).join("")
-            }
-          </div>
-        </div>
-
-        <button type="submit" id="submitBtn" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition shadow-lg shadow-indigo-600/25 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          <span>Сгенерировать ключ(и)</span>
-        </button>
-      </form>
-    </div>
-
-    <!-- Active Portals & Keys Table -->
-    <div class="glass-card rounded-2xl p-6 shadow-xl space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-base font-semibold text-white">Список клиентов и квот</h2>
-          <p class="text-xs text-slate-400">Персональные ссылки, остатки токенов и управление</p>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs text-slate-300">
-          <thead class="text-[11px] text-slate-400 uppercase bg-slate-950/40 border-b border-slate-800">
-            <tr>
-              <th class="py-3 px-4 font-semibold">Покупатель</th>
-              <th class="py-3 px-4 font-semibold">Персональная ссылка</th>
-              <th class="py-3 px-4 font-semibold">Расход токенов</th>
-              <th class="py-3 px-4 font-semibold">Статус</th>
-              <th class="py-3 px-4 font-semibold text-right">Действия</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800/60" id="portalsTableBody">
-            ${
-              portals.length === 0
-                ? `<tr><td colspan="5" class="py-8 text-center text-slate-500">Ключи еще не созданы. Используйте форму выше.</td></tr>`
-                : portals.map((p) => {
-                    const percent = p.tokenLimit > 0 ? Math.min(100, Math.round((p.cachedUsedTokens / p.tokenLimit) * 100)) : 0;
-                    const portalUrl = `${publicUrl}/p/${p.portalToken}`;
-                    return `
-                    <tr class="hover:bg-slate-800/20 transition">
-                      <td class="py-3.5 px-4 font-medium text-white">
-                        <div>${p.clientName}</div>
-                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">${p.apiKey.slice(0, 15)}...</div>
-                      </td>
-                      <td class="py-3.5 px-4">
-                        <div class="flex items-center gap-1.5">
-                          <a href="${portalUrl}" target="_blank" class="text-indigo-400 hover:underline font-mono text-[11px] truncate max-w-[200px]">/p/${p.portalToken}</a>
-                          <button onclick="copyText('${portalUrl}', this)" title="Скопировать ссылку" class="text-slate-400 hover:text-white p-1">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                          </button>
-                        </div>
-                      </td>
-                      <td class="py-3.5 px-4">
-                        <div class="flex items-center gap-2 mb-1">
-                          <span class="font-mono text-slate-200">${formatNum(p.cachedUsedTokens)}</span>
-                          <span class="text-slate-500">/ ${formatNum(p.tokenLimit)}</span>
-                          <span class="text-[10px] text-slate-400 font-mono">(${percent}%)</span>
-                        </div>
-                        <div class="w-32 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                          <div class="h-full rounded-full ${percent >= 100 ? "bg-red-500" : percent > 80 ? "bg-amber-400" : "bg-emerald-500"}" style="width: ${percent}%"></div>
-                        </div>
-                      </td>
-                      <td class="py-3.5 px-4">
-                        ${
-                          p.status === "active"
-                            ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Активен</span>`
-                            : `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">Исчерпан</span>`
-                        }
-                      </td>
-                      <td class="py-3.5 px-4 text-right">
-                        <div class="flex items-center justify-end gap-2">
-                          <button onclick="copyTelegramMessage('${p.clientName}', '${portalUrl}', ${p.tokenLimit}, this)" class="px-2.5 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-lg text-xs font-medium transition flex items-center gap-1 shadow-sm">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                            <span>Для Telegram</span>
-                          </button>
-                          <button onclick="deleteKeyRecord(${p.id}, '${p.clientName}')" class="p-1 text-slate-500 hover:text-red-400 transition" title="Удалить ключ">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    `;
-                  }).join("")
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-
-  <script>
-    function setPresetLimit(n) {
-      document.getElementById('tokenLimit').value = n;
-    }
-
-    function toggleAllModels(checked) {
-      const box = document.getElementById('modelsSelectorBox');
-      if (checked) {
-        box.classList.add('hidden');
-      } else {
-        box.classList.remove('hidden');
-      }
-    }
-
-    function copyText(text, btn) {
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<span class="text-emerald-400 font-bold text-xs">OK</span>';
-        setTimeout(() => { btn.innerHTML = orig; }, 1500);
-      });
-    }
-
-    function copyTelegramMessage(name, portalUrl, limit, btn) {
-      const formatted = limit >= 1000000 ? (limit / 1000000) + ' млн' : limit.toLocaleString();
-      const text = 'Здравствуйте, ' + name + '!\\n\\n' +
-        'Ваш персональный доступ к AI готов.\\n' +
-        'Пакет: ' + formatted + ' токенов\\n\\n' +
-        'Ваша персональная страница с ключом и инструкцией по подключению (Cursor, Python, CLI):\\n' +
-        portalUrl + '\\n\\n' +
-        'Приятной работы!';
-
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<span>Скопировано!</span>';
-        setTimeout(() => { btn.innerHTML = orig; }, 2000);
-      });
-    }
-
-    async function handleCreateKey(e) {
-      e.preventDefault();
-      const btn = document.getElementById('submitBtn');
-      btn.disabled = true;
-      btn.classList.add('opacity-50');
-
-      const clientName = document.getElementById('clientName').value.trim();
-      const tokenLimit = parseInt(document.getElementById('tokenLimit').value, 10);
-      const batchCount = parseInt(document.getElementById('batchCount').value, 10);
-
-      const allModels = document.getElementById('allModelsCheck').checked;
-      let allowedModels = null;
-      if (!allModels) {
-        allowedModels = Array.from(document.querySelectorAll('.model-checkbox:checked')).map(cb => cb.value);
-        if (allowedModels.length === 0) allowedModels = null;
-      }
-
-      try {
-        const res = await fetch('/api/admin/keys/batch-create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientName,
-            tokenLimit,
-            batchCount,
-            allowedModels,
-          }),
+    <dialog id="newKeyDialog" aria-labelledby="createTitle">
+      ${dialogHeading('<span id="createTitle">Новый доступ</span>', "Ключ и личный кабинет клиента за один шаг.")}
+      <form id="createKeyForm"><div class="dialog-body">
+        <div class="field"><label for="clientName">Клиент или название проекта</label><input class="input" type="text" id="clientName" required maxlength="120" placeholder="Например, Александр · Cursor" autocomplete="off" autofocus></div>
+        <div class="form-row"><div class="field"><label for="tokenLimit">Квота токенов</label><input class="input mono" type="number" id="tokenLimit" value="10000000" min="1000" step="1000" required><div class="preset-row"><button type="button" class="preset" data-limit="10000000" aria-pressed="true">10 млн</button><button type="button" class="preset" data-limit="50000000" aria-pressed="false">50 млн</button><button type="button" class="preset" data-limit="100000000" aria-pressed="false">100 млн</button></div></div><div class="field"><label for="batchCount">Количество ключей</label><select class="input" id="batchCount"><option value="1">1 ключ</option><option value="3">3 ключа</option><option value="5">5 ключей</option><option value="10">10 ключей</option><option value="20">20 ключей</option></select><p class="field-help">Отдельная ссылка для каждого.</p></div></div>
+        <div class="field"><span class="field-label">Доступ к моделям</span><label class="check-label"><input type="checkbox" id="allModelsCheck" checked>Все доступные модели</label><div id="modelsSelectorBox" class="model-selector" hidden>${availableModels.length ? availableModels.map((m) => `<label class="check-label"><input type="checkbox" name="models" class="model-checkbox" value="${esc(m.id)}"><span>${esc(m.id)}</span></label>`).join("") : '<p class="muted">Список моделей не получен. Обновите страницу или оставьте доступ ко всем моделям.</p>'}</div></div>
+        <div id="createError" class="notice notice-error" role="alert" hidden></div>
+      </div><div class="dialog-footer"><button type="button" class="btn" data-close>Отмена</button><button type="submit" id="submitBtn" class="btn btn-primary">${icon("plus")}<span>Создать доступ</span></button></div></form>
+    </dialog>
+    <dialog id="modelsDialog" aria-labelledby="modelsTitle">${dialogHeading('<span id="modelsTitle">Модели шлюза</span>', "Список доступных моделей из 9router.")}<div class="dialog-body model-list">${availableModels.length ? availableModels.map((m) => `<div class="model-item"><span class="model-glyph">${icon("layers")}</span><code>${esc(m.id)}</code></div>`).join("") : '<div class="notice">Не удалось получить список моделей. Проверьте подключение к 9router и обновите страницу.</div>'}</div></dialog>
+    <dialog id="connectionDialog" aria-labelledby="connectionTitle">${dialogHeading('<span id="connectionTitle">Подключение к шлюзу</span>', "Используйте этот адрес в приложении клиента.")}<div class="dialog-body"><label for="gatewayEndpoint" class="field-label">Base URL</label><div class="credential-row"><input id="gatewayEndpoint" class="input mono" readonly value="${esc(rootUrl)}/v1"><button class="btn" data-copy="gatewayEndpoint" aria-label="Скопировать Base URL">${icon("copy")}</button></div><div class="notice">У каждого клиента свой API-ключ. Передайте клиенту ссылку на его личный кабинет — ключ и инструкции уже внутри.</div></div></dialog>
+    <dialog id="deleteDialog" aria-labelledby="deleteTitle">${dialogHeading('<span id="deleteTitle">Удалить доступ?</span>', "Ключ будет удалён из шлюза, а личный кабинет станет недоступен.")}<div class="dialog-body"><p id="deleteName"></p><div id="deleteError" class="notice notice-error" role="alert" hidden></div></div><div class="dialog-footer"><button class="btn" data-close>Отмена</button><button class="btn btn-danger" id="confirmDelete">${icon("trash")}Удалить ключ</button></div></dialog>
+    ${toast()}
+    <script>${sharedScript}
+      const clients = ${scriptJson(clientData)};
+      const adminApi = ${scriptJson(adminPath + "/api")};
+      let statusFilter = 'all';
+      let deletingClient = null;
+      function filterClients() {
+        const query = document.getElementById('clientSearch').value.trim().toLocaleLowerCase('ru');
+        let count = 0;
+        document.querySelectorAll('.client-row').forEach((row) => {
+          row.hidden = !(row.dataset.name.includes(query) && (statusFilter === 'all' || row.dataset.status === statusFilter));
+          if (!row.hidden) count++;
         });
-
-        if (!res.ok) {
-          const err = await res.json();
-          alert('Ошибка создания: ' + (err.error || 'Неизвестная ошибка'));
-        } else {
-          window.location.reload();
+        document.getElementById('resultCount').textContent = 'Показано ' + count + ' из ' + clients.length;
+        document.getElementById('emptyRow').hidden = count > 0;
+        if (clients.length) {
+          document.getElementById('emptyTitle').textContent = 'Клиенты не найдены';
+          document.getElementById('emptyDescription').textContent = 'Попробуйте другое имя или измените фильтр статуса.';
+          document.getElementById('emptyCreate').hidden = true;
         }
-      } catch (err) {
-        alert('Сетевая ошибка: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
       }
-    }
-
-    async function deleteKeyRecord(id, name) {
-      if (!confirm('Вы уверены, что хотите удалить ключ для "' + name + '"? Он будет удален и из 9router.')) return;
-      try {
-        const res = await fetch('/api/admin/keys/' + id, { method: 'DELETE' });
-        if (res.ok) {
-          window.location.reload();
-        } else {
-          alert('Ошибка при удалении');
+      document.getElementById('clientSearch').addEventListener('input', filterClients);
+      document.querySelectorAll('[data-filter]').forEach((button) => button.addEventListener('click', () => {
+        statusFilter = button.dataset.filter;
+        document.querySelectorAll('[data-filter]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        filterClients();
+      }));
+      document.getElementById('refreshDashboard').addEventListener('click', () => window.location.reload());
+      function updatePresets() {
+        const value = document.getElementById('tokenLimit').value;
+        document.querySelectorAll('[data-limit]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.limit === value)));
+      }
+      document.querySelectorAll('[data-limit]').forEach((button) => button.addEventListener('click', () => {
+        document.getElementById('tokenLimit').value = button.dataset.limit;
+        updatePresets();
+      }));
+      document.getElementById('tokenLimit').addEventListener('input', updatePresets);
+      document.getElementById('allModelsCheck').addEventListener('change', (event) => {
+        document.getElementById('modelsSelectorBox').hidden = event.target.checked;
+      });
+      document.getElementById('createKeyForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const error = document.getElementById('createError');
+        error.hidden = true;
+        const clientName = document.getElementById('clientName').value.trim();
+        const allowedModels = document.getElementById('allModelsCheck').checked ? null : Array.from(document.querySelectorAll('.model-checkbox:checked'), (input) => input.value);
+        if (!clientName || (allowedModels && !allowedModels.length)) {
+          error.textContent = !clientName ? 'Укажите имя клиента.' : 'Выберите хотя бы одну модель или включите доступ ко всем.';
+          error.hidden = false;
+          return;
         }
-      } catch (err) {
-        alert('Ошибка: ' + err.message);
-      }
-    }
-  </script>
-</body>
-</html>`;
+        const button = document.getElementById('submitBtn');
+        button.disabled = true;
+        button.querySelector('span').textContent = 'Создаём доступ…';
+        try {
+          const response = await fetch(adminApi + '/keys/batch-create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientName, tokenLimit: Number(document.getElementById('tokenLimit').value), batchCount: Number(document.getElementById('batchCount').value), allowedModels }) });
+          const result = await response.json();
+          if (!response.ok) {
+            const partial = result.createdSoFar?.length;
+            throw new Error((result.error || 'Не удалось создать доступ.') + (partial ? ' Уже создано: ' + partial + '. Обновите страницу перед повторной попыткой.' : ''));
+          }
+          window.location.reload();
+        } catch (err) { error.textContent = err.message || 'Не удалось связаться с сервером.'; error.hidden = false; }
+        finally { button.disabled = false; button.querySelector('span').textContent = 'Создать доступ'; }
+      });
+      document.getElementById('portalsTableBody').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+        const client = clients.find((item) => String(item.id) === button.closest('tr').dataset.id);
+        if (!client) return;
+        if (button.dataset.action === 'link') copyText(client.portalUrl);
+        if (button.dataset.action === 'telegram') {
+          const limit = client.tokenLimit === 0 ? 'Без лимита' : new Intl.NumberFormat('ru-RU').format(client.tokenLimit) + ' токенов';
+          copyText(['Здравствуйте, ' + client.clientName + '!', '', 'Ваш персональный доступ к AI готов.', 'Пакет: ' + limit, '', 'Ключ и инструкция по подключению в личном кабинете:', client.portalUrl, '', 'Приятной работы!'].join('\\n'));
+        }
+        if (button.dataset.action === 'delete') {
+          deletingClient = client;
+          document.getElementById('deleteName').textContent = 'Клиент: ' + client.clientName;
+          document.getElementById('deleteError').hidden = true;
+          document.getElementById('deleteDialog').showModal();
+        }
+      });
+      document.getElementById('confirmDelete').addEventListener('click', async (event) => {
+        if (!deletingClient) return;
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+          const response = await fetch(adminApi + '/keys/' + encodeURIComponent(deletingClient.id), { method: 'DELETE' });
+          if (!response.ok) throw new Error('Не удалось удалить ключ. Попробуйте ещё раз.');
+          window.location.reload();
+        } catch (err) {
+          const error = document.getElementById('deleteError');
+          error.textContent = err.message;
+          error.hidden = false;
+        } finally { button.disabled = false; }
+      });
+    </script></body></html>`;
 }

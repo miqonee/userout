@@ -126,6 +126,17 @@ class RouterClient {
     return models;
   }
 
+  async getModelsForKey(apiKey) {
+    // Never reuse the administrator's catalog cache for a personal key.
+    const response = await fetch(`${config.routerUrl}/v1/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error(`Could not load client models (${response.status})`);
+    const data = await response.json();
+    return Array.isArray(data.data) ? data.data : [];
+  }
+
   async createKey({ name, tokenLimit = 0, allowedModels = null }) {
     const res = await this.authenticatedFetch("/api/keys", {
       method: "POST",
