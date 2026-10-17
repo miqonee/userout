@@ -122,11 +122,7 @@ export function initAdminDashboard({ clients, adminApi, publicUrl }) {
     if (createBusy) return;
     const error = document.getElementById('createError');
     error.hidden = true;
-    let clientName = document.getElementById('clientName').value.trim();
-    if (!clientName) {
-      clientName = generateRandomName();
-      document.getElementById('clientName').value = clientName;
-    }
+    const clientName = document.getElementById('clientName').value.trim();
     const allowedModels = document.getElementById('allModelsCheck').checked ? null : Array.from(document.querySelectorAll('.model-checkbox:checked'), (input) => input.value);
     if (allowedModels && !allowedModels.length) {
       error.textContent = 'Выберите хотя бы одну модель или включите доступ ко всем.';
@@ -145,6 +141,7 @@ export function initAdminDashboard({ clients, adminApi, publicUrl }) {
       const created = response.ok ? result.portals : result.createdSoFar;
       if (!created?.length) throw new Error(result.error || 'Не удалось создать доступ.');
       byId('newKeyDialog').close();
+      document.getElementById('clientName').value = '';
       reloadAfterExport = true;
       const items = created.map((c) => ({ ...c, usedTokens: c.cachedUsedTokens, portalUrl: publicUrl + '/p/' + encodeURIComponent(c.portalToken) }));
       const warning = response.ok ? '' : 'Создано ' + created.length + ' из ' + requested + '. Ошибок: ' + (result.failedCount || 1) + '. Не создано: ' + (requested - created.length) + '. ' + (result.error || 'Выпуск остановлен.');

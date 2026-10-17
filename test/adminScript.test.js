@@ -154,6 +154,16 @@ test('full and partial batch creation offer only new invitations and reload afte
     assert.equal(f.reloads, 1);
   }
 });
+test('batch creation leaves clientName empty when no name was entered', async () => {
+  const f = dashboardFixture(samples);
+  let requestBody = null;
+  f.fetch = async (url, opts) => {
+    requestBody = JSON.parse(opts.body);
+    return response({ portals: [{ id: 99, portalToken: 'x', apiKey: 'y', tokenLimit: 100, cachedUsedTokens: 0 }] });
+  };
+  await f.get('createKeyForm').emit('submit');
+  assert.equal(requestBody.clientName, '');
+});
 test('clipboard failure selects the export and exposes a manual fallback for Telegram', async () => {
   const f = dashboardFixture(samples);
   f.clipboardFails = true;

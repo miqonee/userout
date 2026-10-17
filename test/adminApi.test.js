@@ -131,4 +131,21 @@ test('admin key operations against an isolated upstream and database', async (t)
     assert.equal(result.json().failedCount, 1);
     assert.ok(getPortalById(result.json().createdSoFar[0].id));
   });
+  await t.test('batch creation without clientName generates single random names without separator', async () => {
+    const res = await request('POST', '/batch-create', { clientName: '   ', tokenLimit: 1000, batchCount: 2 });
+    assert.equal(res.statusCode, 201);
+    const portals = res.json().portals;
+    assert.equal(portals.length, 2);
+    for (const p of portals) {
+      assert.ok(!p.clientName.includes(' · '), `Expected single name without separator, got ${p.clientName}`);
+      assert.ok(p.clientName.trim().length > 0);
+    }
+    const singleNamed = await request('POST', '/batch-create', { clientName: 'Тестовый', tokenLimit: 1000, batchCount: 1 });
+    assert.equal(singleNamed.json().portals[0].clientName, 'Тестовый');
+
+    const batchNamed = await request('POST', '/batch-create', { clientName: 'Пакет', tokenLimit: 1000, batchCount: 2 });
+    for (const p of batchNamed.json().portals) {
+      assert.ok(p.clientName.startsWith('Пакет · '), `Expected name with prefix 'Пакет · ', got ${p.clientName}`);
+    }
+  });
 });
