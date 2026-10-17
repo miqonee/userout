@@ -31,6 +31,7 @@ const paths = {
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
   terminal: '<path d="m5 7 5 5-5 5M13 17h6"/>',
+  dice: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
 };
 
 export function icon(name, className = "") {
@@ -256,6 +257,9 @@ const styles = `
   .field label,.field-label{display:block;font-size:12px;font-weight:550;margin-bottom:8px}
   .input{width:100%;height:42px;padding:10px 12px;border:1px solid #dce2da;background:#fff;color:var(--ink);font-size:13px}
   .input::placeholder{color:#a0a89f}
+  .input-with-action{display:flex;gap:8px;align-items:center}
+  .input-with-action .input{flex:1}
+  .btn-random-name{height:42px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;cursor:pointer}
   .field-help{font-size:11px;color:#8c958b;margin-top:7px}
   .form-row{display:grid;grid-template-columns:1.5fr 1fr;gap:15px}
   .preset-row{display:flex;gap:7px;margin-top:8px}

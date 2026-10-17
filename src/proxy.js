@@ -1,5 +1,6 @@
 import { config } from "./config.js";
 import { getPortalByApiKey, updatePortalUsage } from "./db.js";
+import { toUpstreamModel, toUserFacingModel } from "./models.js";
 import { Readable } from "node:stream";
 
 export function extractClientApiKey(req) {
@@ -54,7 +55,19 @@ export async function handleProxyRequest(req, reply) {
 
   let body = null;
   if (req.method !== "GET" && req.method !== "HEAD") {
-    body = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
+    let parsed = null;
+    if (typeof req.body === "string") {
+      try { parsed = JSON.parse(req.body); } catch {}
+    } else if (req.body && typeof req.body === "object") {
+      parsed = { ...req.body };
+    }
+
+    if (parsed && typeof parsed.model === "string") {
+      parsed.model = toUpstreamModel(parsed.model);
+      body = JSON.stringify(parsed);
+    } else {
+      body = typeof req.body === "string" ? req.body : (req.body ? JSON.stringify(req.body) : null);
+    }
   }
 
   try {
@@ -83,6 +96,29 @@ export async function handleProxyRequest(req, reply) {
     if (retryAfter) reply.header("retry-after", retryAfter);
 
     reply.status(status);
+
+    // Intercept and normalize /v1/models response
+    const isModelsEndpoint = req.method === "GET" && req.url.split("?")[0] === "/v1/models";
+    if (isModelsEndpoint && upstreamRes.ok) {
+      try {
+        const json = await upstreamRes.json();
+        if (Array.isArray(json?.data)) {
+          const list = [];
+          for (const m of json.data) {
+            if (typeof m.id === "string" && m.id.startsWith("ag/")) {
+              list.push({ ...m, id: toUserFacingModel(m.id) });
+              list.push(m);
+            } else {
+              list.push(m);
+            }
+          }
+          json.data = list;
+          return reply.send(json);
+        }
+      } catch (err) {
+        req.log.warn({ err }, "Could not transform /v1/models response");
+      }
+    }
 
     // If body is empty
     if (!upstreamRes.body) {

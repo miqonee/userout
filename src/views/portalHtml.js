@@ -1,5 +1,6 @@
 import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, toast } from "./ui.js";
 import { buildConnectionGuides } from "./connectionGuides.js";
+import { toUserFacingModel } from "../models.js";
 
 function statePage({ title, clientName, message, note, label }) {
   return `${head(`${title}${clientName ? ` — ${clientName}` : ""}`, { privatePage: true })}<body class="state-page"><main class="state-card">${brand()}<div class="state-icon">${icon("key")}</div><div class="eyebrow muted" style="margin-bottom:12px">${label}</div><h1>${title}</h1><p>${message}</p><div class="notice">${note}</div><footer class="state-footer">Route AI Gateway &nbsp; / &nbsp; Персональный доступ</footer></main></body></html>`;
@@ -17,7 +18,8 @@ export function renderPortalHtml({ clientName, portalToken, apiKey, tokenLimit, 
 
   const percentUsed = unlimited ? 0 : Math.min(100, Math.max(0, Math.round(usedTokens / tokenLimit * 100)));
   const remainingTokens = Math.max(0, tokenLimit - usedTokens);
-  const models = (availableModels ?? allowedModels ?? []).filter((id) => typeof id === "string" && id.trim() && !id.includes("*"));
+  const rawModels = (availableModels ?? allowedModels ?? []).filter((id) => typeof id === "string" && id.trim() && !id.includes("*"));
+  const models = [...new Set(rawModels.map(toUserFacingModel))];
   const sampleModel = models[0];
   const rootUrl = String(publicUrl || "").replace(/\/+$/, "");
   const guides = sampleModel ? buildConnectionGuides({ publicUrl: rootUrl, apiKey, model: sampleModel, models }) : null;

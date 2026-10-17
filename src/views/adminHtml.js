@@ -1,4 +1,5 @@
 import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, sidebar, toast } from "./ui.js";
+import { toUserFacingModel } from "../models.js";
 
 function dialogHeading(title, description) {
   return `<div class="dialog-heading"><div><h2>${title}</h2><p>${description}</p></div><button type="button" class="icon-button" data-close aria-label="Закрыть окно">${icon("close")}</button></div>`;
@@ -69,13 +70,13 @@ export function renderAdminDashboardHtml({ portals = [], availableModels = [], p
     <dialog id="newKeyDialog" aria-labelledby="createTitle">
       ${dialogHeading('<span id="createTitle">Новый доступ</span>', "Ключ и личный кабинет клиента за один шаг.")}
       <form id="createKeyForm"><div class="dialog-body">
-        <div class="field"><label for="clientName">Клиент или название проекта</label><input class="input" type="text" id="clientName" required maxlength="120" placeholder="Например, Александр · Cursor" autocomplete="off" autofocus></div>
+        <div class="field"><label for="clientName">Клиент или название проекта</label><div class="input-with-action"><input class="input" type="text" id="clientName" maxlength="120" placeholder="Например, Александр или оставьте пустым" autocomplete="off" autofocus><button type="button" class="btn btn-random-name" id="generateNameBtn" title="Сгенерировать случайное имя" aria-label="Сгенерировать случайное имя">${icon("dice")}<span>Случайное</span></button></div></div>
         <div class="form-row"><div class="field"><label for="tokenLimit">Квота токенов</label><input class="input mono" type="number" id="tokenLimit" value="10000000" min="1000" step="1000" required><div class="preset-row"><button type="button" class="preset" data-limit="10000000" aria-pressed="true">10 млн</button><button type="button" class="preset" data-limit="50000000" aria-pressed="false">50 млн</button><button type="button" class="preset" data-limit="100000000" aria-pressed="false">100 млн</button></div></div><div class="field"><label for="batchCount">Количество ключей</label><select class="input" id="batchCount"><option value="1">1 ключ</option><option value="3">3 ключа</option><option value="5">5 ключей</option><option value="10">10 ключей</option><option value="20">20 ключей</option></select><p class="field-help">Отдельная ссылка для каждого.</p></div></div>
-        <div class="field"><span class="field-label">Доступ к моделям</span><label class="check-label"><input type="checkbox" id="allModelsCheck" checked>Все доступные модели</label><div id="modelsSelectorBox" class="model-selector" hidden>${availableModels.length ? availableModels.map((m) => `<label class="check-label"><input type="checkbox" name="models" class="model-checkbox" value="${esc(m.id)}"><span>${esc(m.id)}</span></label>`).join("") : '<p class="muted">Список моделей не получен. Обновите страницу или оставьте доступ ко всем моделям.</p>'}</div></div>
+        <div class="field"><span class="field-label">Доступ к моделям</span><label class="check-label"><input type="checkbox" id="allModelsCheck" checked>Все доступные модели</label><div id="modelsSelectorBox" class="model-selector" hidden>${availableModels.length ? availableModels.map((m) => `<label class="check-label"><input type="checkbox" name="models" class="model-checkbox" value="${esc(m.id)}"><span>${esc(toUserFacingModel(m.id))}</span>${m.id.startsWith("ag/") ? `<small class="muted" style="margin-left:6px;font-size:11px">(${esc(m.id)})</small>` : ""}</label>`).join("") : '<p class="muted">Список моделей не получен. Обновите страницу или оставьте доступ ко всем моделям.</p>'}</div></div>
         <div id="createError" class="notice notice-error" role="alert" hidden></div>
       </div><div class="dialog-footer"><button type="button" class="btn" data-close>Отмена</button><button type="submit" id="submitBtn" class="btn btn-primary">${icon("plus")}<span>Создать доступ</span></button></div></form>
     </dialog>
-    <dialog id="modelsDialog" aria-labelledby="modelsTitle">${dialogHeading('<span id="modelsTitle">Модели шлюза</span>', "Список доступных моделей из 9router.")}<div class="dialog-body model-list">${availableModels.length ? availableModels.map((m) => `<div class="model-item"><span class="model-glyph">${icon("layers")}</span><code>${esc(m.id)}</code></div>`).join("") : '<div class="notice">Не удалось получить список моделей. Проверьте подключение к 9router и обновите страницу.</div>'}</div></dialog>
+    <dialog id="modelsDialog" aria-labelledby="modelsTitle">${dialogHeading('<span id="modelsTitle">Модели шлюза</span>', "Список доступных моделей из 9router.")}<div class="dialog-body model-list">${availableModels.length ? availableModels.map((m) => `<div class="model-item"><span class="model-glyph">${icon("layers")}</span><code>${esc(toUserFacingModel(m.id))}</code>${m.id.startsWith("ag/") ? `<small class="muted" style="margin-left:8px">(${esc(m.id)})</small>` : ""}</div>`).join("") : '<div class="notice">Не удалось получить список моделей. Проверьте подключение к 9router и обновите страницу.</div>'}</div></dialog>
     <dialog id="connectionDialog" aria-labelledby="connectionTitle">${dialogHeading('<span id="connectionTitle">Подключение к шлюзу</span>', "Используйте этот адрес в приложении клиента.")}<div class="dialog-body"><label for="gatewayEndpoint" class="field-label">Base URL</label><div class="credential-row"><input id="gatewayEndpoint" class="input mono" readonly value="${esc(rootUrl)}/v1"><button class="btn" data-copy="gatewayEndpoint" aria-label="Скопировать Base URL">${icon("copy")}</button></div><div class="notice">У каждого клиента свой API-ключ. Передайте клиенту ссылку на его личный кабинет — ключ и инструкции уже внутри.</div></div></dialog>
     <dialog id="deleteDialog" aria-labelledby="deleteTitle">${dialogHeading('<span id="deleteTitle">Удалить доступ?</span>', "Ключ будет удалён из шлюза, а личный кабинет станет недоступен.")}<div class="dialog-body"><p id="deleteName"></p><div id="deleteError" class="notice notice-error" role="alert" hidden></div></div><div class="dialog-footer"><button class="btn" data-close>Отмена</button><button class="btn btn-danger" id="confirmDelete">${icon("trash")}Удалить ключ</button></div></dialog>
     ${toast()}
@@ -118,14 +119,29 @@ export function renderAdminDashboardHtml({ portals = [], availableModels = [], p
       document.getElementById('allModelsCheck').addEventListener('change', (event) => {
         document.getElementById('modelsSelectorBox').hidden = event.target.checked;
       });
+      function generateRandomName() {
+        const ruAdj = ["Квантовый","Неоновый","Северный","Янтарный","Лазурный","Быстрый","Звёздный","Астральный","Кибер","Изумрудный","Тихий","Солнечный","Лунный","Серебряный","Золотой","Магнитный","Космический","Атласный","Рассветный","Глубокий","Орбитальный","Цифровой","Кристальный","Пламенный","Векторный","Штормовой","Таинственный","Полярный","Яркий","Гармоничный"];
+        const ruNoun = ["Спутник","Вектор","Орион","Пульсар","Феникс","Шторм","Атлас","Сокол","Луч","Горизонт","Импульс","Маяк","Компас","Призма","Зенит","Поток","Ковчег","Вихрь","Спектр","Страж","Рубеж","Радар","Квазар","Сигнал","Пилот","Генезис","Синтез","Контур","Метеор","Фокус"];
+        const enAdj = ["Quantum","Neon","Northern","Amber","Azure","Swift","Stellar","Astral","Cyber","Emerald","Silent","Solar","Lunar","Silver","Golden","Magnetic","Cosmic","Velvet","Dawn","Deep","Orbital","Digital","Crystal","Blazing","Vector","Storm","Mystic","Polar","Vibrant","Harmonic"];
+        const enNoun = ["Satellite","Vector","Orion","Pulsar","Phoenix","Storm","Atlas","Falcon","Beam","Horizon","Pulse","Beacon","Compass","Prism","Zenith","Stream","Vessel","Vortex","Spectrum","Sentinel","Apex","Radar","Quasar","Signal","Pilot","Genesis","Synergy","Circuit","Meteor","Focus"];
+        const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        return Math.random() < 0.5 ? (pick(enAdj) + " " + pick(enNoun)) : (pick(ruAdj) + " " + pick(ruNoun));
+      }
+      document.getElementById('generateNameBtn').addEventListener('click', () => {
+        document.getElementById('clientName').value = generateRandomName();
+      });
       document.getElementById('createKeyForm').addEventListener('submit', async (event) => {
         event.preventDefault();
         const error = document.getElementById('createError');
         error.hidden = true;
-        const clientName = document.getElementById('clientName').value.trim();
+        let clientName = document.getElementById('clientName').value.trim();
+        if (!clientName) {
+          clientName = generateRandomName();
+          document.getElementById('clientName').value = clientName;
+        }
         const allowedModels = document.getElementById('allModelsCheck').checked ? null : Array.from(document.querySelectorAll('.model-checkbox:checked'), (input) => input.value);
-        if (!clientName || (allowedModels && !allowedModels.length)) {
-          error.textContent = !clientName ? 'Укажите имя клиента.' : 'Выберите хотя бы одну модель или включите доступ ко всем.';
+        if (allowedModels && !allowedModels.length) {
+          error.textContent = 'Выберите хотя бы одну модель или включите доступ ко всем.';
           error.hidden = false;
           return;
         }

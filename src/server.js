@@ -20,6 +20,7 @@ import {
 import { renderPortalHtml, renderMissingPortalHtml } from "./views/portalHtml.js";
 import { renderAdminLoginHtml, renderAdminDashboardHtml } from "./views/adminHtml.js";
 import { faviconSvg } from "./views/ui.js";
+import { generateRandomClientName } from "./names.js";
 
 const fastify = Fastify({
   trustProxy: config.trustProxy,
@@ -261,11 +262,15 @@ fastify.post(adminPath + "/api/keys/batch-create", async (req, reply) => {
   let { clientName, tokenLimit, batchCount = 1, allowedModels = null } = req.body;
   batchCount = Math.max(1, Math.min(20, parseInt(batchCount, 10) || 1));
   tokenLimit = Math.max(0, parseInt(tokenLimit, 10) || 0);
+  const baseName = typeof clientName === "string" ? clientName.trim() : "";
 
   const createdPortals = [];
 
   for (let i = 1; i <= batchCount; i++) {
-    const name = batchCount > 1 ? `${clientName} #${i}` : clientName;
+    const randomName = generateRandomClientName();
+    const name = baseName
+      ? (batchCount > 1 ? `${baseName} #${i}` : baseName)
+      : (batchCount > 1 ? `${randomName} #${i}` : randomName);
     try {
       // 1. Create in 9router
       const routerKey = await routerClient.createKey({

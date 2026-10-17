@@ -6,6 +6,8 @@ import { renderPortalHtml, renderMissingPortalHtml } from "../src/views/portalHt
 import { faviconSvg, faviconDataUri } from "../src/views/ui.js";
 import { buildConnectionGuides } from "../src/views/connectionGuides.js";
 import { resolvePortalModels } from "../src/services/portalModels.js";
+import { generateRandomClientName } from "../src/names.js";
+import { toUserFacingModel, toUpstreamModel } from "../src/models.js";
 
 const portal = {
   id: 1, clientName: "Клиент", portalToken: "test-token", apiKey: "sk-test-secret-123456",
@@ -180,4 +182,49 @@ test("personal pages use only the client name as their heading and no promotiona
   assert.ok(!html.includes("Всё для первого запроса"));
   assert.ok(!html.includes("квота, ключ и настройка ваших инструментов"));
   assert.ok(!html.includes("Личная ссылка действует"));
+});
+
+test("random client name generator produces purely Russian or purely English names", () => {
+  const generated = new Set();
+  let hasCyrillic = false;
+  let hasLatin = false;
+
+  for (let i = 0; i < 100; i++) {
+    const name = generateRandomClientName();
+    assert.equal(typeof name, "string");
+    assert.ok(name.length >= 4);
+    generated.add(name);
+
+    const isCyrillic = /^[а-яёА-ЯЁ\s-]+$/.test(name);
+    const isLatin = /^[a-zA-Z\s-]+$/.test(name);
+    assert.ok(isCyrillic || isLatin, `Name "${name}" must be strictly in one language (RU or EN)`);
+
+    if (isCyrillic) hasCyrillic = true;
+    if (isLatin) hasLatin = true;
+  }
+
+  assert.ok(hasCyrillic, "Generator should produce Russian names");
+  assert.ok(hasLatin, "Generator should produce English names");
+  assert.ok(generated.size > 20, "Generator should have good variety");
+});
+
+test("model normalization strips ag/ for user facing displays and restores it for upstream", () => {
+  assert.equal(toUserFacingModel("ag/gemini-3.8-flash"), "gemini-3.8-flash");
+  assert.equal(toUserFacingModel("ag/gemini-2.0-flash"), "gemini-2.0-flash");
+  assert.equal(toUserFacingModel("openai/gpt-4o"), "openai/gpt-4o");
+
+  assert.equal(toUpstreamModel("gemini-3.8-flash"), "ag/gemini-3.8-flash");
+  assert.equal(toUpstreamModel("ag/gemini-3.8-flash"), "ag/gemini-3.8-flash");
+  assert.equal(toUpstreamModel("openai/gpt-4o"), "openai/gpt-4o");
+
+  // Portal cleans ag/ from displayed chips and guide configs
+  const html = renderPortalHtml({ ...portal, allowedModels: ["ag/gemini-3.8-flash"] });
+  assert.ok(html.includes("<code>gemini-3.8-flash</code>"));
+  assert.ok(!html.includes("<code>ag/gemini-3.8-flash</code>"));
+
+  // Admin dashboard includes random name button and dice icon
+  const dashboard = renderAdminDashboardHtml({ publicUrl: portal.publicUrl, availableModels: [{ id: "ag/gemini-3.8-flash" }] });
+  assert.ok(dashboard.includes('id="generateNameBtn"'));
+  assert.ok(dashboard.includes("Случайное"));
+  checkInlineScripts(dashboard);
 });
