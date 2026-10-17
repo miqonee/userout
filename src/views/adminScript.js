@@ -13,7 +13,7 @@ export function initAdminDashboard({ clients, adminApi, publicUrl }) {
   const depleted = (c) => c.status === 'depleted' || (c.tokenLimit > 0 && c.usedTokens >= c.tokenLimit);
 
   function invitation(client) {
-    return ['Ваш дашборд для отслеживания расхода и инструкции:', client.portalUrl].join('\n');
+    return ['Ссылка на дашборд для отслеживания расхода и инструкции:', client.portalUrl].join('\n');
   }
   async function copyOrSelect(text, area = null) {
     if (await copyText(text)) return true;
