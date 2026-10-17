@@ -11,6 +11,8 @@ export function scriptJson(value) {
 }
 
 const paths = {
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>',
+  moon: '<path d="M20.8 13.3A9 9 0 0 1 10.7 3.2a9 9 0 1 0 10.1 10.1Z"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   key: '<circle cx="8" cy="15" r="5"/><path d="m11.5 11.5 9-9M16 7l3 3M19 4l2 2"/>',
   layers: '<path d="m12 3 10 5-10 5L2 8l10-5ZM2 12l10 5 10-5M2 16l10 5 10-5"/>',
@@ -62,34 +64,38 @@ export const faviconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 export const faviconDataUri = `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
 
 export function themeControl() {
-  return '<label class="theme-control"><span>Тема</span><select class="theme-select" data-theme-select aria-label="Тема оформления"><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>';
+  return `<button type="button" class="theme-toggle" role="switch" data-theme-toggle aria-label="Тёмная тема" aria-checked="false" title="Включить тёмную тему">${icon('moon', 'theme-moon')}${icon('sun', 'theme-sun')}</button>`;
 }
 
 function initTheme() {
   const key = 'route-theme';
-  const valid = (value) => ['light', 'dark'].includes(value) ? value : 'system';
-  const read = () => { try { return valid(localStorage.getItem(key)); } catch { return 'system'; } };
+  const valid = (value) => value === 'dark' ? 'dark' : 'light';
+  const read = () => { try { return valid(localStorage.getItem(key)); } catch { return 'light'; } };
+  let currentTheme;
   function apply(value) {
-    document.getElementById('route-dark-theme').media = value === 'dark' ? 'all' : value === 'light' ? 'not all' : '(prefers-color-scheme: dark)';
-    document.querySelectorAll('[data-theme-select]').forEach((select) => { select.value = value; });
+    currentTheme = value;
+    document.getElementById('route-dark-theme').media = value === 'dark' ? 'all' : 'not all';
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      button.setAttribute('aria-checked', String(value === 'dark'));
+      button.title = value === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
+    });
   }
   // Run in head so a saved preference takes effect before the first paint.
   apply(read());
   document.addEventListener('DOMContentLoaded', () => apply(read()));
-  document.addEventListener('change', (event) => {
-    if (!event.target.matches('[data-theme-select]')) return;
-    const value = valid(event.target.value);
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-theme-toggle]')) return;
+    const value = currentTheme === 'dark' ? 'light' : 'dark';
     apply(value);
     try {
-      if (value === 'system') localStorage.removeItem(key);
-      else localStorage.setItem(key, value);
+      localStorage.setItem(key, value);
     } catch { /* The current page still works when storage is unavailable. */ }
   });
   window.addEventListener('storage', (event) => { if (event.key === key || event.key === null) apply(read()); });
 }
 
 export function head(title, { privatePage = false } = {}) {
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="referrer" content="no-referrer">${privatePage ? '<meta name="robots" content="noindex, nofollow, noarchive">' : ""}<title>${escapeHtml(title)} — Route</title><link rel="icon" type="image/svg+xml" href="${faviconDataUri}"><style>${styles}</style><style id="route-dark-theme" media="(prefers-color-scheme: dark)">${darkStyles}</style><script>(${initTheme.toString()})();</script></head>`;
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="referrer" content="no-referrer">${privatePage ? '<meta name="robots" content="noindex, nofollow, noarchive">' : ""}<title>${escapeHtml(title)} — Route</title><link rel="icon" type="image/svg+xml" href="${faviconDataUri}"><style>${styles}</style><style id="route-dark-theme" media="not all">${darkStyles}</style><script>(${initTheme.toString()})();</script></head>`;
 }
 
 export function toast() {
@@ -165,8 +171,11 @@ const styles = `
   strong{font-weight:600}
   [hidden]{display:none!important}
   .muted{color:var(--muted)}
-  .theme-control{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;white-space:nowrap}
-  .theme-select{height:34px;padding:5px 8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:11px;cursor:pointer}
+  .theme-toggle{width:34px;height:34px;display:inline-grid;place-items:center;flex-shrink:0;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--muted);transition:background .15s,color .15s}
+  .theme-toggle:hover{background:var(--paper);color:var(--ink)}
+  .theme-toggle .icon{width:16px;height:16px}
+  .theme-toggle .theme-sun,.theme-toggle[aria-checked="true"] .theme-moon{display:none}
+  .theme-toggle[aria-checked="true"] .theme-sun{display:block}
   .masthead-actions{display:flex;align-items:center;gap:20px}
   .personal-access-label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
   .login-theme{display:flex;justify-content:flex-end;margin-bottom:24px}
@@ -600,7 +609,7 @@ const styles = `
   .toast{bottom:16px}
   .state-card>.brand{margin-bottom:44px}
   .state-card h1{font-size:27px}}
-  @media(max-width:600px){.theme-control>span,.personal-access-label,.topbar .user-avatar{display:none}
+  @media(max-width:600px){.personal-access-label,.topbar .user-avatar{display:none}
   .topbar .breadcrumb{min-width:0;flex-wrap:wrap;gap:0 8px}
   .state-header{margin-bottom:44px}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
@@ -608,42 +617,56 @@ const styles = `
 `;
 
 const darkStyles = `
-    :root{color-scheme:dark;--canvas:#151b18;--paper:#202823;--ink:#e5ece7;--muted:#a3afa7;--line:#354039;--green:#91c9a1;--sidebar:#111713}
+    :root{color-scheme:dark;--canvas:#12151b;--paper:#1c2129;--ink:#e7ebf1;--muted:#a0aab9;--line:#303844;--green:#9ac4ab;--lime:#c2d8ad;--sidebar:#161a21}
     .login-page,.state-page{background:var(--canvas)}
+    .sidebar{color:#a6afba}
+    .nav-item:hover{background:#252c35;color:#edf0f4}
+    .nav-item.is-active{background:#293a34;color:#c9e0d1}
     dialog,.input,.search-field input,.tag{background:var(--paper);color:var(--ink);border-color:var(--line)}
     .btn,.funpay-area{border-color:var(--line)}
     .search-field input{color:var(--ink)}
-    .count,.filter-tabs,.empty-icon,.support-strip,.dialog-footer,.funpay-area,.bonus-summary,.preset,.model-glyph,.code-block,.setup-parameters,.model-chips code,.quick-note{background:#28332b;border-color:var(--line)}
+    .count,.filter-tabs,.empty-icon,.support-strip,.dialog-footer,.funpay-area,.bonus-summary,.preset,.model-glyph,.setup-parameters,.model-chips code,.quick-note{background:#252c36;border-color:var(--line)}
+    .code-block{background:#161b23;border-color:var(--line)}
+    .code-header{background:#1c222c}
     .tag,.metric-label,.metric-foot,.filter-tab,.client-key,.usage-value span,.table-link,.table-footer,.support-strip p,.field-help,.preset,.model-glyph,.models-note,.quick-note,.login-note,.state-card>p,.state-footer,.portal-masthead>span:last-child,.portal-models h2,.setup-parameters dt,.guide-content .setup-caption,.guide-source,.code-header,.tab{color:var(--muted)}
     .input::placeholder{color:var(--muted)}
-    th{background:#1b231e;color:var(--muted)}
+    th{background:#181d25;color:var(--muted)}
     td,.model-item,.setup-parameters>div,.code-header,.state-footer{border-color:var(--line)}
-    tbody tr:hover,.btn:hover,.icon-button:hover{background:#303d33;border-color:#536359;color:var(--ink)}
-    .filter-tab[aria-pressed="true"]{background:#3b4d3d;color:#e0f0da;box-shadow:none}
+    tbody tr:hover,.btn:hover,.icon-button:hover{background:#2a333f;border-color:#465464;color:var(--ink)}
+    .filter-tab[aria-pressed="true"]{background:#394551;color:#e1eaf2;box-shadow:none}
     .filter-tab:hover,.table-link:hover,.guide-source:hover{color:var(--lime)}
-    .client-avatar{background:#303d2d;border-color:#45513e;color:#c1d3b1}
+    .client-avatar{background:#2c3b35;border-color:#41574c;color:#c0d7c7}
     .client-row:nth-child(3n+2) .client-avatar{background:#2e3749;border-color:#414e64;color:#c3cfe8}
     .client-row:nth-child(3n+3) .client-avatar{background:#44362d;border-color:#604a3c;color:#e2c4ab}
     .usage-value,.setup-title,.guide-content strong,.quick-note h3,.portal-masthead .brand,.state-card>.brand{color:var(--ink)}
-    .client-row.is-selected,.bulk-actions,.metric-accent,.quota-panel,.bonus-calc,.notice,.preset[aria-pressed="true"]{background:#293a2b;border-color:#43573d}
-    .metric-accent .metric-number,.bonus-calc,.notice,.preset[aria-pressed="true"],.tab[aria-selected="true"],.manual-setup summary{color:#bcdaa9}
-    .badge{background:#2b4030;border-color:#46654a;color:#b7ddbf}
-    .badge.is-warning{background:#443920;border-color:#6a572b;color:#e8d192}
-    .badge.is-depleted,.notice-error{background:#432c28;border-color:#72473d;color:#f0b7ab}
+    .client-row.is-selected,.bulk-actions{background:#26372f}
+    .metric-accent,.quota-panel{background:#222f2e;border-color:#3b514a}
+    .bonus-calc,.notice,.preset[aria-pressed="true"]{background:#263730;border-color:#3f594b}
+    .metric-accent .metric-number,.bonus-calc,.notice,.preset[aria-pressed="true"],.tab[aria-selected="true"],.manual-setup summary{color:#b9d8c5}
+    .badge{background:#263b30;border-color:#43624e;color:#bbdfc7}
+    .badge.is-warning{background:#3e3322;border-color:#685533;color:#e7cb96}
+    .badge.is-depleted,.notice-error{background:#3d2929;border-color:#684543;color:#e9b2a8}
     .icon-button{color:var(--muted)}
     .icon-button.danger:hover{background:#432c28;border-color:#72473d;color:#f0b7ab}
-    .btn-primary{background:#2b6347;border-color:#2b6347;color:#fff}
-    .btn-primary:hover{background:#347956;border-color:#347956;color:#fff}
-    .btn-dark{background:#354d3c;border-color:#536a58;color:#fff}
-    .btn-dark:hover{background:#415e4a;border-color:#6a8571;color:#fff}
+    .btn-primary{background:#426f58;border-color:#538068;color:#fff}
+    .btn-primary:hover{background:#4b7c64;border-color:#619277;color:#fff}
+    .btn-dark{background:#344b40;border-color:#506c5c;color:#fff}
+    .btn-dark:hover{background:#405d4d;border-color:#648371;color:#fff}
     .btn-danger{background:#ab413a;border-color:#ab413a;color:#fff}
     .btn-danger:hover{background:#8e302a;border-color:#8e302a;color:#fff}
-    .quota-top .eyebrow,.quota-caption,.quota-details>div,.sync-label,.ring-label small{color:#b0c0a6}
-    .quota-details strong,.ring-label{color:#c4dcb3}
-    .quota-divider,.mini-meter{background:#3d4e38}
-    .quota-details>div+div{border-color:#43573d}
-    .ring-track{stroke:#3d4e38}
-    .ring-value{stroke:#a5c88b}
-    .code-block pre,.guide-content,.model-chips code{color:#c1d2b6}
-    .state-icon{background:#443920;border-color:#6a572b;color:#e8d192}
+    .quota-top .eyebrow,.quota-caption,.quota-details>div,.sync-label,.ring-label small{color:#aebeb8}
+    .quota-details strong,.ring-label{color:#c0decf}
+    .quota-divider{background:#3b4e47}
+    .mini-meter{background:#343e49}
+    .mini-meter>span{background:#84b49b}
+    .quota-details>div+div{border-color:#3b4e47}
+    .ring-track{stroke:#3b4e47}
+    .ring-value{stroke:#94c4aa}
+    .code-block pre,.guide-content,.model-chips code{color:#c0ccdc}
+    .credentials-panel{background:#1a202a;border-color:#343e4b}
+    .credential-input{background:#121821;border-color:#3b4757;color:#d0ddec}
+    .credential-row .icon-button{border-color:#3b4757;color:#b0c0d3}
+    .credential-row .icon-button:hover{background:#2b3746;border-color:#5c7089;color:#e3ebf5}
+    .credential-label,.credential-hint{color:#a0aebf}
+    .state-icon{background:#3e3322;border-color:#685533;color:#e7cb96}
 `;

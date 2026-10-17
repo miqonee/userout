@@ -13,30 +13,38 @@ const takeScreenshot = async (page, name) => {
   await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
   await page.screenshot({ path: join(process.env.UI_SCREENSHOT_DIR, name + '.png'), fullPage: true, animations: 'disabled' });
 };
+async function setTheme(page, theme) {
+  const toggle = page.getByRole('switch', { name: 'Тёмная тема' });
+  if (await toggle.getAttribute('aria-checked') !== String(theme === 'dark')) await toggle.click();
+}
 async function checkThemeControl(page) {
-  const select = page.getByRole('combobox', { name: 'Тема оформления' });
-  assert.equal(await select.isVisible(), true);
+  const toggle = page.getByRole('switch', { name: 'Тёмная тема' });
+  assert.equal(await toggle.isVisible(), true);
+  assert.equal(await page.locator('[data-theme-select]').count(), 0);
   for (const theme of ['light', 'dark']) {
-    await select.selectOption(theme);
+    await setTheme(page, theme);
     await page.emulateMedia({ colorScheme: theme === 'light' ? 'dark' : 'light' });
     assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), theme);
     await page.reload();
-    assert.equal(await select.inputValue(), theme);
+    assert.equal(await toggle.getAttribute('aria-checked'), String(theme === 'dark'));
     assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), theme);
   }
-  await select.selectOption('system');
+  await toggle.focus();
+  await page.keyboard.press('Space');
+  assert.equal(await toggle.getAttribute('aria-checked'), 'false');
   await checkTheme(page, 'light');
   await checkTheme(page, 'dark');
 }
 async function checkTheme(page, theme) {
-  await page.emulateMedia({ colorScheme: theme });
+  await setTheme(page, theme);
+  await page.emulateMedia({ colorScheme: theme === 'light' ? 'dark' : 'light' });
   assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), theme);
   const lightBackgrounds = { 'state-page': 'rgb(246, 248, 242)', 'login-page': 'rgb(250, 251, 248)' };
   const bodyClass = await page.locator('body').getAttribute('class');
-  const expectedBackground = theme === 'dark' ? 'rgb(21, 27, 24)' : lightBackgrounds[bodyClass] || 'rgb(247, 248, 250)';
+  const expectedBackground = theme === 'dark' ? 'rgb(18, 21, 27)' : lightBackgrounds[bodyClass] || 'rgb(247, 248, 250)';
   assert.equal(await page.locator('body').evaluate((el) => getComputedStyle(el).backgroundColor), expectedBackground);
   if (theme !== 'dark') return;
-  const contrasts = await page.locator('.metric-label,.metric-foot,.code-block pre,.guide-content,.setup-title,.badge,.quota-caption,.notice,.input,.state-card>p,.funpay-area').evaluateAll((elements) => {
+  const contrasts = await page.locator('.metric-label,.metric-foot,.code-block pre,.guide-content,.setup-title,.badge,.quota-caption,.notice,.input,.state-card>p,.funpay-area,.credential-label,.credential-hint,.credential-input,.btn-primary').evaluateAll((elements) => {
     const luminance = (rgb) => rgb.map((v) => v / 255).map((v) => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
     const rgb = (value) => value.match(/[\d.]+/g).map(Number);
     return elements.filter((el) => el.checkVisibility()).map((el) => {
@@ -75,7 +83,7 @@ try {
     await checkTheme(page, theme);
     await takeScreenshot(page, 'admin-' + theme);
   }
-  // Theme changes apply to the same open document without a reload.
+  // Manual changes apply immediately and persist independently of the OS.
   await checkThemeControl(page);
   await checkTheme(page, 'light');
   const portal = await context.newPage();
@@ -92,19 +100,23 @@ try {
     await portal.setViewportSize({ width: 1440, height: 1050 });
   }
   // Manual choices propagate to another open page in the same browser.
-  await portal.getByRole('combobox', { name: 'Тема оформления' }).selectOption('dark');
+  await setTheme(portal, 'light');
+  await page.waitForFunction(() => getComputedStyle(document.documentElement).colorScheme === 'light');
+  await setTheme(portal, 'dark');
   await page.waitForFunction(() => getComputedStyle(document.documentElement).colorScheme === 'dark');
-  assert.equal(await page.getByRole('combobox', { name: 'Тема оформления' }).inputValue(), 'dark');
-  await portal.getByRole('combobox', { name: 'Тема оформления' }).selectOption('system');
+  assert.equal(await page.getByRole('switch', { name: 'Тёмная тема' }).getAttribute('aria-checked'), 'true');
+  await setTheme(portal, 'light');
   await page.waitForFunction(() => getComputedStyle(document.documentElement).colorScheme === 'light');
   await portal.close();
-  const blockedContext = await browser.newContext({ colorScheme: 'light' });
+  const blockedContext = await browser.newContext({ colorScheme: 'dark' });
   await blockedContext.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked'); } }));
   const blockedPage = await blockedContext.newPage();
   const blockedErrors = [];
   blockedPage.on('pageerror', (err) => blockedErrors.push(err.message));
   await blockedPage.goto(new URL('/p/demo-1', address).href);
-  await blockedPage.getByRole('combobox', { name: 'Тема оформления' }).selectOption('dark');
+  // Light is the default even with a dark OS preference and blocked storage.
+  assert.equal(await blockedPage.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), 'light');
+  await setTheme(blockedPage, 'dark');
   assert.equal(await blockedPage.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), 'dark');
   assert.deepEqual(blockedErrors, []);
   await blockedContext.close();
@@ -210,7 +222,7 @@ try {
   assert.equal((await page.locator('#funpayTextarea').inputValue()).split('\n').length, 1);
   assert.match(await page.locator('#batchResult').textContent(), /Ошибок: 1/);
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed: automatic light/dark themes, dark text contrast, portal states, selection, filtering, exact export format, short links, clipboard fallback, bonus, full/partial creation, deletion retry, desktop and mobile.');
+  console.log('Browser checks passed: binary theme toggle, persistence, keyboard, cross-tab sync, OS independence, dark text contrast, portal states, exact export, short links, clipboard fallback, bonus, creation, deletion, desktop and mobile.');
 } finally {
   await browser.close();
 }
