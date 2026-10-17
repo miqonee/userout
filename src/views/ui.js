@@ -32,6 +32,8 @@ const paths = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
   terminal: '<path d="m5 7 5 5-5 5M13 17h6"/>',
   dice: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
+  box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5" rx="1"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
 };
 
 export function icon(name, className = "") {
@@ -260,6 +262,11 @@ const styles = `
   .input-with-action{display:flex;gap:8px;align-items:center}
   .input-with-action .input{flex:1}
   .btn-random-name{height:42px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;cursor:pointer}
+  .funpay-area{width:100%;height:220px;font-family:var(--mono);font-size:11px;line-height:1.45;padding:12px;border:1px solid #dce2da;border-radius:8px;background:#f9faf7;color:var(--ink);resize:vertical;white-space:pre}
+  .bonus-summary{background:#f4f7f1;border:1px solid #e1e8db;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .bonus-summary small{display:block;font-size:10px;color:var(--muted);margin-bottom:2px}
+  .bonus-summary strong{font-size:14px;color:var(--ink)}
+  .bonus-calc{background:#eff4ea;border:1px solid #d5e0cd;border-radius:8px;padding:10px 14px;font-size:12px;margin-top:14px;color:#35532d}
   .field-help{font-size:11px;color:#8c958b;margin-top:7px}
   .form-row{display:grid;grid-template-columns:1.5fr 1fr;gap:15px}
   .preset-row{display:flex;gap:7px;margin-top:8px}

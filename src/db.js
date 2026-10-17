@@ -128,4 +128,16 @@ export function deletePortalRecord(id) {
   return stmt.run(id).changes > 0;
 }
 
+export function updatePortalLimit(id, newTokenLimit) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE portals
+    SET token_limit = ?,
+        status = CASE WHEN ? > 0 AND cached_used_tokens < ? THEN 'active' ELSE status END,
+        updated_at = ?
+    WHERE id = ?
+  `).run(newTokenLimit, newTokenLimit, newTokenLimit, now, id);
+  return getPortalById(id);
+}
+
 export { db };

@@ -228,3 +228,24 @@ test("model normalization strips ag/ for user facing displays and restores it fo
   assert.ok(dashboard.includes("Случайное"));
   checkInlineScripts(dashboard);
 });
+
+test("admin dashboard includes FunPay auto-delivery export, bonus dialog and clean telegram message", () => {
+  const dashboard = renderAdminDashboardHtml({ portals: [portal], publicUrl: portal.publicUrl });
+  // Telegram copy does not append client name to Здравствуйте
+  assert.ok(dashboard.includes("'Здравствуйте!'"));
+  assert.ok(!dashboard.includes("'Здравствуйте, ' + client.clientName"));
+
+  // FunPay dialog
+  assert.ok(dashboard.includes('id="funpayDialog"'));
+  assert.ok(dashboard.includes('id="funpayTextarea"'));
+  assert.ok(dashboard.includes("Автовыдача FunPay"));
+
+  // Bonus tokens dialog and table action button
+  assert.ok(dashboard.includes('data-action="bonus"'));
+  assert.ok(dashboard.includes('id="bonusDialog"'));
+  assert.ok(dashboard.includes('id="bonusAmountInput"'));
+  assert.ok(dashboard.includes('id="bonusPercentInput"'));
+  assert.ok(dashboard.includes('id="bonusPreview"'));
+
+  checkInlineScripts(dashboard);
+});

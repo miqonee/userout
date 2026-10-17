@@ -41,16 +41,16 @@ export function renderAdminDashboardHtml({ portals = [], availableModels = [], p
       <td><span class="usage-value">${formatNum(p.cachedUsedTokens)} <span>/ ${unlimited ? "∞" : formatNum(p.tokenLimit)}</span></span><div class="mini-meter ${depleted ? "is-depleted" : percent >= 80 ? "is-warning" : ""}" role="meter" aria-label="Квота ${esc(p.clientName)}" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${unlimited ? "Без лимита" : `${percent}% использовано`}"><span style="width:${percent}%"></span></div></td>
       <td><span class="badge ${depleted ? "is-depleted" : ""}"><span class="dot"></span>${depleted ? "Исчерпан" : "Активен"}</span></td>
       <td><a class="table-link" href="${esc(portalUrl)}" target="_blank" rel="noopener noreferrer">Личный кабинет ${icon("external")}</a></td>
-      <td><div class="table-actions"><button class="icon-button" data-action="link" title="Скопировать ссылку" aria-label="Скопировать ссылку: ${esc(p.clientName)}">${icon("copy")}</button><button class="icon-button" data-action="telegram" title="Скопировать сообщение для Telegram" aria-label="Сообщение для Telegram: ${esc(p.clientName)}">${icon("send")}</button><button class="icon-button danger" data-action="delete" title="Удалить ключ" aria-label="Удалить ключ: ${esc(p.clientName)}">${icon("trash")}</button></div></td>
+      <td><div class="table-actions"><button class="icon-button" data-action="link" title="Скопировать ссылку" aria-label="Скопировать ссылку: ${esc(p.clientName)}">${icon("copy")}</button><button class="icon-button" data-action="telegram" title="Скопировать сообщение для Telegram" aria-label="Сообщение для Telegram: ${esc(p.clientName)}">${icon("send")}</button><button class="icon-button" data-action="bonus" title="Начислить бонусные токены" aria-label="Бонус: ${esc(p.clientName)}">${icon("gift")}</button><button class="icon-button danger" data-action="delete" title="Удалить ключ" aria-label="Удалить ключ: ${esc(p.clientName)}">${icon("trash")}</button></div></td>
     </tr>`;
   }).join("");
-  const clientData = portals.map(({ id, clientName, portalToken, tokenLimit }) => ({ id, clientName, portalUrl: `${rootUrl}/p/${encodeURIComponent(portalToken)}`, tokenLimit }));
+  const clientData = portals.map(({ id, clientName, portalToken, tokenLimit, cachedUsedTokens, status }) => ({ id, clientName, portalUrl: `${rootUrl}/p/${encodeURIComponent(portalToken)}`, tokenLimit, usedTokens: cachedUsedTokens, status }));
 
   return `${head("Обзор рабочего пространства", { privatePage: true })}<body><div class="app-shell">
     ${sidebar({ adminPath })}
     <main class="main" id="overview">
       <header class="topbar"><div class="breadcrumb">Рабочее пространство <span>/</span> <strong>Обзор</strong></div><div class="topbar-meta"><span class="tag">AI GATEWAY</span><span class="user-avatar" style="color:#65715f;border-color:#dce3d5;width:29px;height:29px">A</span><a class="icon-button" href="${esc(adminPath)}/logout" aria-label="Выйти" title="Выйти">${icon("logout")}</a></div></header>
-      <section class="page-heading"><div><h1>Обзор пространства</h1><p class="subtitle">Клиенты, ключи и использование токенов.</p></div><div class="heading-actions"><button class="btn" id="refreshDashboard">${icon("refresh")}Обновить</button><button class="btn btn-primary" data-open="newKeyDialog">${icon("plus")}Новый ключ</button></div></section>
+      <section class="page-heading"><div><h1>Обзор пространства</h1><p class="subtitle">Клиенты, ключи и использование токенов.</p></div><div class="heading-actions"><button class="btn" data-open="funpayDialog">${icon("box")}Автовыдача FunPay</button><button class="btn" id="refreshDashboard">${icon("refresh")}Обновить</button><button class="btn btn-primary" data-open="newKeyDialog">${icon("plus")}Новый ключ</button></div></section>
       <section class="metrics" aria-label="Сводка по клиентам">
         <article class="metric"><div class="metric-label">Всего клиентов ${icon("grid")}</div><div class="metric-number">${formatNum(stats.totalCount)}</div><div class="metric-foot">В вашем пространстве</div></article>
         <article class="metric"><div class="metric-label">Активные ключи ${icon("key")}</div><div class="metric-number">${formatNum(stats.activeCount)}</div><div class="metric-foot"><span class="dot" style="color:#739b64"></span>Готовы к работе</div></article>
@@ -79,6 +79,19 @@ export function renderAdminDashboardHtml({ portals = [], availableModels = [], p
     <dialog id="modelsDialog" aria-labelledby="modelsTitle">${dialogHeading('<span id="modelsTitle">Модели шлюза</span>', "Список доступных моделей из 9router.")}<div class="dialog-body model-list">${availableModels.length ? availableModels.map((m) => `<div class="model-item"><span class="model-glyph">${icon("layers")}</span><code>${esc(toUserFacingModel(m.id))}</code>${m.id.startsWith("ag/") ? `<small class="muted" style="margin-left:8px">(${esc(m.id)})</small>` : ""}</div>`).join("") : '<div class="notice">Не удалось получить список моделей. Проверьте подключение к 9router и обновите страницу.</div>'}</div></dialog>
     <dialog id="connectionDialog" aria-labelledby="connectionTitle">${dialogHeading('<span id="connectionTitle">Подключение к шлюзу</span>', "Используйте этот адрес в приложении клиента.")}<div class="dialog-body"><label for="gatewayEndpoint" class="field-label">Base URL</label><div class="credential-row"><input id="gatewayEndpoint" class="input mono" readonly value="${esc(rootUrl)}/v1"><button class="btn" data-copy="gatewayEndpoint" aria-label="Скопировать Base URL">${icon("copy")}</button></div><div class="notice">У каждого клиента свой API-ключ. Передайте клиенту ссылку на его личный кабинет — ключ и инструкции уже внутри.</div></div></dialog>
     <dialog id="deleteDialog" aria-labelledby="deleteTitle">${dialogHeading('<span id="deleteTitle">Удалить доступ?</span>', "Ключ будет удалён из шлюза, а личный кабинет станет недоступен.")}<div class="dialog-body"><p id="deleteName"></p><div id="deleteError" class="notice notice-error" role="alert" hidden></div></div><div class="dialog-footer"><button class="btn" data-close>Отмена</button><button class="btn btn-danger" id="confirmDelete">${icon("trash")}Удалить ключ</button></div></dialog>
+    <dialog id="funpayDialog" aria-labelledby="funpayTitle">${dialogHeading('<span id="funpayTitle">Автовыдача FunPay</span>', "Формат: одна строка — один товар. Переносы строк внутри товара оформлены как \\n.")}<div class="dialog-body">
+      <div class="filter-tabs" role="group" aria-label="Фильтр товаров" style="margin-bottom:14px"><button type="button" class="filter-tab" id="funpayFilterUnused" aria-pressed="true">Только новые (0 токенов)</button><button type="button" class="filter-tab" id="funpayFilterAll" aria-pressed="false">Все активные ключи</button></div>
+      <textarea class="funpay-area" id="funpayTextarea" readonly spellcheck="false"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><span id="funpayCount" class="muted" style="font-size:12px"></span><button type="button" class="btn btn-primary" id="copyFunpayBtn">${icon("copy")}<span>Скопировать всё для FunPay</span></button></div>
+    </div><div class="dialog-footer"><button type="button" class="btn" data-close>Закрыть</button></div></dialog>
+    <dialog id="bonusDialog" aria-labelledby="bonusTitle">${dialogHeading('<span id="bonusTitle">Начислить токены</span>', "Добавление токенов к лимиту ключа (бонус за отзыв покупателя).")}<form id="bonusForm"><div class="dialog-body">
+      <div class="bonus-summary"><div><small>Клиент</small><strong id="bonusClientName"></strong></div><div><small>Текущий лимит</small><strong id="bonusCurrentLimit"></strong></div><div><small>Остаток</small><strong id="bonusRemaining"></strong></div></div>
+      <div class="field"><span class="field-label">Быстрый процент от пакета</span><div class="preset-row"><button type="button" class="preset bonus-preset" data-pct="5">+5%</button><button type="button" class="preset bonus-preset" data-pct="10" aria-pressed="true">+10%</button><button type="button" class="preset bonus-preset" data-pct="15">+15%</button><button type="button" class="preset bonus-preset" data-pct="20">+20%</button></div></div>
+      <div class="form-row"><div class="field"><label for="bonusAmountInput">Токенов к начислению</label><input class="input mono" type="number" id="bonusAmountInput" min="1" step="1000" required></div><div class="field"><label for="bonusPercentInput">Или в процентах (%)</label><input class="input mono" type="number" id="bonusPercentInput" value="10" min="1" max="1000"></div></div>
+      <div class="bonus-calc" id="bonusPreview"></div>
+      <div id="bonusError" class="notice notice-error" role="alert" hidden style="margin-top:12px"></div>
+      <div id="bonusSuccess" class="notice" role="status" hidden style="margin-top:12px"></div>
+    </div><div class="dialog-footer"><button type="button" class="btn" data-close>Отмена</button><button type="submit" id="submitBonusBtn" class="btn btn-primary">${icon("gift")}<span>Начислить токены</span></button></div></form></dialog>
     ${toast()}
     <script>${sharedScript}
       const clients = ${scriptJson(clientData)};
@@ -167,13 +180,126 @@ export function renderAdminDashboardHtml({ portals = [], availableModels = [], p
         if (button.dataset.action === 'link') copyText(client.portalUrl);
         if (button.dataset.action === 'telegram') {
           const limit = client.tokenLimit === 0 ? 'Без лимита' : new Intl.NumberFormat('ru-RU').format(client.tokenLimit) + ' токенов';
-          copyText(['Здравствуйте, ' + client.clientName + '!', '', 'Ваш персональный доступ к AI готов.', 'Пакет: ' + limit, '', 'Ключ и инструкция по подключению в личном кабинете:', client.portalUrl, '', 'Приятной работы!'].join('\\n'));
+          copyText(['Здравствуйте!', '', 'Ваш персональный доступ к AI готов.', 'Пакет: ' + limit, '', 'Ключ и инструкция по подключению в личном кабинете:', client.portalUrl, '', 'Приятной работы!'].join('\\n'));
+        }
+        if (button.dataset.action === 'bonus') {
+          activeBonusClient = client;
+          const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n);
+          const remaining = Math.max(0, (client.tokenLimit || 0) - (client.usedTokens || 0));
+          document.getElementById('bonusClientName').textContent = client.clientName;
+          document.getElementById('bonusCurrentLimit').textContent = client.tokenLimit === 0 ? 'Без лимита' : fmt(client.tokenLimit);
+          document.getElementById('bonusRemaining').textContent = client.tokenLimit === 0 ? '∞' : fmt(remaining);
+          document.getElementById('bonusPercentInput').value = 10;
+          document.getElementById('bonusError').hidden = true;
+          document.getElementById('bonusSuccess').hidden = true;
+          document.getElementById('submitBonusBtn').hidden = false;
+          recalculateBonus(true);
+          document.getElementById('bonusDialog').showModal();
         }
         if (button.dataset.action === 'delete') {
           deletingClient = client;
           document.getElementById('deleteName').textContent = 'Клиент: ' + client.clientName;
           document.getElementById('deleteError').hidden = true;
           document.getElementById('deleteDialog').showModal();
+        }
+      });
+      let funpayFilterOnlyUnused = true;
+      function generateFunpayGoods() {
+        const items = clients.filter((c) => {
+          if (c.status === 'depleted') return false;
+          if (funpayFilterOnlyUnused) return (c.usedTokens || 0) === 0;
+          return true;
+        });
+        const lines = items.map((c) => {
+          const limit = c.tokenLimit === 0 ? 'Без лимита' : new Intl.NumberFormat('ru-RU').format(c.tokenLimit) + ' токенов';
+          return 'Здравствуйте!\\n\\nВаш персональный доступ к AI готов.\\nПакет: ' + limit + '\\n\\nЛичный кабинет с ключом и инструкцией:\\n' + c.portalUrl + '\\n\\nПриятной работы!';
+        });
+        document.getElementById('funpayTextarea').value = lines.join('\\n');
+        document.getElementById('funpayCount').textContent = 'Готово товаров: ' + lines.length;
+      }
+      document.getElementById('funpayFilterUnused').addEventListener('click', (e) => {
+        funpayFilterOnlyUnused = true;
+        e.target.setAttribute('aria-pressed', 'true');
+        document.getElementById('funpayFilterAll').setAttribute('aria-pressed', 'false');
+        generateFunpayGoods();
+      });
+      document.getElementById('funpayFilterAll').addEventListener('click', (e) => {
+        funpayFilterOnlyUnused = false;
+        e.target.setAttribute('aria-pressed', 'true');
+        document.getElementById('funpayFilterUnused').setAttribute('aria-pressed', 'false');
+        generateFunpayGoods();
+      });
+      document.querySelector('[data-open="funpayDialog"]')?.addEventListener('click', generateFunpayGoods);
+      document.getElementById('copyFunpayBtn').addEventListener('click', () => {
+        const text = document.getElementById('funpayTextarea').value;
+        if (!text) { notify('Нет товаров для выгрузки', true); return; }
+        copyText(text);
+      });
+      let activeBonusClient = null;
+      function recalculateBonus(fromPercent = true) {
+        if (!activeBonusClient) return;
+        const currentLimit = activeBonusClient.tokenLimit || 0;
+        const amountInput = document.getElementById('bonusAmountInput');
+        const percentInput = document.getElementById('bonusPercentInput');
+        let addTokens = 0;
+        if (fromPercent) {
+          const pct = parseFloat(percentInput.value) || 0;
+          addTokens = Math.round((currentLimit * pct) / 100);
+          amountInput.value = addTokens;
+        } else {
+          addTokens = parseInt(amountInput.value, 10) || 0;
+          if (currentLimit > 0) percentInput.value = Math.round((addTokens / currentLimit) * 100);
+        }
+        const newLimit = currentLimit + addTokens;
+        const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n);
+        document.getElementById('bonusPreview').innerHTML = 'Новый лимит: <strong>' + fmt(currentLimit) + '</strong> &rarr; <strong>' + fmt(newLimit) + '</strong> (+' + fmt(addTokens) + ' токенов)';
+        document.querySelectorAll('.bonus-preset').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b.dataset.pct === percentInput.value));
+        });
+      }
+      document.getElementById('bonusPercentInput').addEventListener('input', () => recalculateBonus(true));
+      document.getElementById('bonusAmountInput').addEventListener('input', () => recalculateBonus(false));
+      document.querySelectorAll('.bonus-preset').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.getElementById('bonusPercentInput').value = btn.dataset.pct;
+          recalculateBonus(true);
+        });
+      });
+      document.getElementById('bonusForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!activeBonusClient) return;
+        const addTokens = parseInt(document.getElementById('bonusAmountInput').value, 10);
+        if (!addTokens || addTokens <= 0) return;
+        const btn = document.getElementById('submitBonusBtn');
+        btn.disabled = true;
+        btn.querySelector('span').textContent = 'Начисляем…';
+        const errBox = document.getElementById('bonusError');
+        const okBox = document.getElementById('bonusSuccess');
+        errBox.hidden = true;
+        okBox.hidden = true;
+        try {
+          const res = await fetch(adminApi + '/keys/' + encodeURIComponent(activeBonusClient.id) + '/add-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addTokens })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Ошибка при начислении токенов');
+          const fmt = (n) => new Intl.NumberFormat('ru-RU').format(n);
+          activeBonusClient.tokenLimit = data.newLimit;
+          const clientMsg = ['Спасибо за ваш отзыв!', '', 'Вам начислено +' + fmt(data.addedTokens) + ' бонусных токенов.', 'Новый лимит вашего пакета: ' + fmt(data.newLimit) + ' токенов.', '', 'Проверить баланс: ' + data.portalUrl, 'Приятной работы!'].join('\\n');
+          okBox.innerHTML = 'Токены начислены! Новый лимит: <strong>' + fmt(data.newLimit) + '</strong>.<br><button type="button" class="btn btn-primary" style="margin-top:8px" id="copyBonusResponseBtn">Скопировать ответ покупателю</button>';
+          okBox.hidden = false;
+          btn.hidden = true;
+          document.getElementById('copyBonusResponseBtn').addEventListener('click', () => {
+            copyText(clientMsg);
+          });
+        } catch (err) {
+          errBox.textContent = err.message || 'Ошибка соединения';
+          errBox.hidden = false;
+        } finally {
+          btn.disabled = false;
+          btn.querySelector('span').textContent = 'Начислить токены';
         }
       });
       document.getElementById('confirmDelete').addEventListener('click', async (event) => {

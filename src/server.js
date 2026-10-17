@@ -15,6 +15,7 @@ import {
   createPortalRecord,
   deletePortalRecord,
   updatePortalUsage,
+  updatePortalLimit,
   db,
 } from "./db.js";
 import { renderPortalHtml, renderMissingPortalHtml } from "./views/portalHtml.js";
@@ -269,8 +270,8 @@ fastify.post(adminPath + "/api/keys/batch-create", async (req, reply) => {
   for (let i = 1; i <= batchCount; i++) {
     const randomName = generateRandomClientName();
     const name = baseName
-      ? (batchCount > 1 ? `${baseName} #${i}` : baseName)
-      : (batchCount > 1 ? `${randomName} #${i}` : randomName);
+      ? (batchCount > 1 ? `${baseName} · ${randomName}` : baseName)
+      : randomName;
     try {
       // 1. Create in 9router
       const routerKey = await routerClient.createKey({
@@ -299,6 +300,41 @@ fastify.post(adminPath + "/api/keys/batch-create", async (req, reply) => {
   }
 
   return reply.status(201).send({ success: true, count: createdPortals.length, portals: createdPortals });
+});
+
+// Admin API: Add Tokens (Bonus)
+fastify.post(adminPath + "/api/keys/:id/add-tokens", async (req, reply) => {
+  if (!isAdminAuthenticated(req)) {
+    return reply.status(401).send({ error: "Unauthorized" });
+  }
+
+  const { id } = req.params;
+  const portal = getPortalById(id);
+  if (!portal) return reply.status(404).send({ error: "Key not found" });
+
+  let { addTokens } = req.body || {};
+  addTokens = parseInt(addTokens, 10);
+  if (isNaN(addTokens) || addTokens <= 0) {
+    return reply.status(400).send({ error: "Укажите положительное количество токенов для начисления." });
+  }
+
+  const newLimit = (portal.tokenLimit || 0) + addTokens;
+
+  try {
+    await routerClient.updateKey(portal.keyId, { tokenLimit: newLimit });
+  } catch (err) {
+    req.log.warn({ err }, `Could not update limit for key ${portal.keyId} in 9router`);
+  }
+
+  const updated = updatePortalLimit(portal.id, newLimit);
+  return reply.send({
+    success: true,
+    oldLimit: portal.tokenLimit,
+    newLimit: updated.tokenLimit,
+    addedTokens: addTokens,
+    clientName: portal.clientName,
+    portalUrl: `${config.publicUrl}/p/${encodeURIComponent(portal.portalToken)}`,
+  });
 });
 
 // Admin API: Delete Key
