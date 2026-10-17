@@ -55,8 +55,11 @@ export function sidebar({ portal = false, clientName = "", active = "overview", 
   </aside>`;
 }
 
+export const faviconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="9" fill="#c1e998"/><path d="M9 23V9h8a4 4 0 0 1 0 8h-3m3 0 6 6" stroke="#212622" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+export const faviconDataUri = `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
+
 export function head(title, { privatePage = false } = {}) {
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><meta name="referrer" content="no-referrer">${privatePage ? '<meta name="robots" content="noindex, nofollow, noarchive">' : ""}<title>${escapeHtml(title)} — Route</title><style>${styles}</style></head>`;
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><meta name="referrer" content="no-referrer">${privatePage ? '<meta name="robots" content="noindex, nofollow, noarchive">' : ""}<title>${escapeHtml(title)} — Route</title><link rel="icon" type="image/svg+xml" href="${faviconDataUri}"><style>${styles}</style></head>`;
 }
 
 export function toast() {

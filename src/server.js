@@ -19,6 +19,7 @@ import {
 } from "./db.js";
 import { renderPortalHtml, renderMissingPortalHtml } from "./views/portalHtml.js";
 import { renderAdminLoginHtml, renderAdminDashboardHtml } from "./views/adminHtml.js";
+import { faviconSvg } from "./views/ui.js";
 
 const fastify = Fastify({
   trustProxy: config.trustProxy,
@@ -315,6 +316,14 @@ fastify.delete(adminPath + "/api/keys/:id", async (req, reply) => {
   // Delete in local DB
   deletePortalRecord(id);
   return reply.send({ success: true });
+});
+
+// Favicon endpoints
+fastify.get("/favicon.ico", async (req, reply) => {
+  return reply.type("image/svg+xml").header("Cache-Control", "public, max-age=86400").send(faviconSvg);
+});
+fastify.get("/favicon.svg", async (req, reply) => {
+  return reply.type("image/svg+xml").header("Cache-Control", "public, max-age=86400").send(faviconSvg);
 });
 
 // Public health check for Docker; it does not disclose the administration path.

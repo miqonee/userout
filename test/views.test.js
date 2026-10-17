@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Script } from "node:vm";
 import { renderAdminDashboardHtml, renderAdminLoginHtml } from "../src/views/adminHtml.js";
 import { renderPortalHtml, renderMissingPortalHtml } from "../src/views/portalHtml.js";
+import { faviconSvg, faviconDataUri } from "../src/views/ui.js";
 import { buildConnectionGuides } from "../src/views/connectionGuides.js";
 import { resolvePortalModels } from "../src/services/portalModels.js";
 
@@ -89,6 +90,15 @@ test("all personal page states opt out of indexing and the active page has no si
   assert.ok(active.includes('id="btn-codex"'));
   for (const html of [active, renderPortalHtml({ ...portal, isDepleted: true }), renderMissingPortalHtml()]) {
     assert.ok(html.includes('<meta name="robots" content="noindex, nofollow, noarchive">'));
+  }
+});
+
+test("all pages include the brand-mark svg favicon in head", () => {
+  assert.ok(faviconSvg.includes('fill="#c1e998"'));
+  assert.ok(faviconSvg.includes('stroke="#212622"'));
+  const linkTag = `<link rel="icon" type="image/svg+xml" href="${faviconDataUri}">`;
+  for (const html of [renderMissingPortalHtml(), renderAdminDashboardHtml({ publicUrl: portal.publicUrl }), renderAdminLoginHtml(), renderPortalHtml(portal)]) {
+    assert.ok(html.includes(linkTag));
   }
 });
 
