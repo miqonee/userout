@@ -61,8 +61,35 @@ export function sidebar({ portal = false, clientName = "", active = "overview", 
 export const faviconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="9" fill="#c1e998"/><path d="M9 23V9h8a4 4 0 0 1 0 8h-3m3 0 6 6" stroke="#212622" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 export const faviconDataUri = `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
 
+export function themeControl() {
+  return '<label class="theme-control"><span>Тема</span><select class="theme-select" data-theme-select aria-label="Тема оформления"><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>';
+}
+
+function initTheme() {
+  const key = 'route-theme';
+  const valid = (value) => ['light', 'dark'].includes(value) ? value : 'system';
+  const read = () => { try { return valid(localStorage.getItem(key)); } catch { return 'system'; } };
+  function apply(value) {
+    document.getElementById('route-dark-theme').media = value === 'dark' ? 'all' : value === 'light' ? 'not all' : '(prefers-color-scheme: dark)';
+    document.querySelectorAll('[data-theme-select]').forEach((select) => { select.value = value; });
+  }
+  // Run in head so a saved preference takes effect before the first paint.
+  apply(read());
+  document.addEventListener('DOMContentLoaded', () => apply(read()));
+  document.addEventListener('change', (event) => {
+    if (!event.target.matches('[data-theme-select]')) return;
+    const value = valid(event.target.value);
+    apply(value);
+    try {
+      if (value === 'system') localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch { /* The current page still works when storage is unavailable. */ }
+  });
+  window.addEventListener('storage', (event) => { if (event.key === key || event.key === null) apply(read()); });
+}
+
 export function head(title, { privatePage = false } = {}) {
-  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="referrer" content="no-referrer">${privatePage ? '<meta name="robots" content="noindex, nofollow, noarchive">' : ""}<title>${escapeHtml(title)} — Route</title><link rel="icon" type="image/svg+xml" href="${faviconDataUri}"><style>${styles}</style></head>`;
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="referrer" content="no-referrer">${privatePage ? '<meta name="robots" content="noindex, nofollow, noarchive">' : ""}<title>${escapeHtml(title)} — Route</title><link rel="icon" type="image/svg+xml" href="${faviconDataUri}"><style>${styles}</style><style id="route-dark-theme" media="(prefers-color-scheme: dark)">${darkStyles}</style><script>(${initTheme.toString()})();</script></head>`;
 }
 
 export function toast() {
@@ -138,6 +165,13 @@ const styles = `
   strong{font-weight:600}
   [hidden]{display:none!important}
   .muted{color:var(--muted)}
+  .theme-control{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;white-space:nowrap}
+  .theme-select{height:34px;padding:5px 8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:11px;cursor:pointer}
+  .masthead-actions{display:flex;align-items:center;gap:20px}
+  .personal-access-label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
+  .login-theme{display:flex;justify-content:flex-end;margin-bottom:24px}
+  .state-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:64px}
+  .state-header .brand{color:var(--ink)}
   .mono,code,pre{font-family:var(--mono)}
   .eyebrow{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase}
   .subtitle{color:var(--muted);margin-top:9px;font-size:14px}
@@ -566,7 +600,14 @@ const styles = `
   .toast{bottom:16px}
   .state-card>.brand{margin-bottom:44px}
   .state-card h1{font-size:27px}}
-  @media(prefers-color-scheme:dark){
+  @media(max-width:600px){.theme-control>span,.personal-access-label,.topbar .user-avatar{display:none}
+  .topbar .breadcrumb{min-width:0;flex-wrap:wrap;gap:0 8px}
+  .state-header{margin-bottom:44px}}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
+  *,*:before,*:after{animation:none!important;transition:none!important}}
+`;
+
+const darkStyles = `
     :root{color-scheme:dark;--canvas:#151b18;--paper:#202823;--ink:#e5ece7;--muted:#a3afa7;--line:#354039;--green:#91c9a1;--sidebar:#111713}
     .login-page,.state-page{background:var(--canvas)}
     dialog,.input,.search-field input,.tag{background:var(--paper);color:var(--ink);border-color:var(--line)}
@@ -605,7 +646,4 @@ const styles = `
     .ring-value{stroke:#a5c88b}
     .code-block pre,.guide-content,.model-chips code{color:#c1d2b6}
     .state-icon{background:#443920;border-color:#6a572b;color:#e8d192}
-  }
-  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
-  *,*:before,*:after{animation:none!important;transition:none!important}}
 `;

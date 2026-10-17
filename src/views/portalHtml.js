@@ -1,9 +1,9 @@
-import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, toast } from "./ui.js";
+import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, toast, themeControl } from "./ui.js";
 import { buildConnectionGuides } from "./connectionGuides.js";
 import { toUserFacingModel } from "../models.js";
 
 function statePage({ title, clientName, message, note, label }) {
-  return `${head(`${title}${clientName ? ` — ${clientName}` : ""}`, { privatePage: true })}<body class="state-page"><main class="state-card">${brand()}<div class="state-icon">${icon("key")}</div><div class="eyebrow muted" style="margin-bottom:12px">${label}</div><h1>${title}</h1><p>${message}</p><div class="notice">${note}</div><footer class="state-footer">Route AI Gateway &nbsp; / &nbsp; Персональный доступ</footer></main></body></html>`;
+  return `${head(`${title}${clientName ? ` — ${clientName}` : ""}`, { privatePage: true })}<body class="state-page"><main class="state-card"><header class="state-header">${brand()}${themeControl()}</header><div class="state-icon">${icon("key")}</div><div class="eyebrow muted" style="margin-bottom:12px">${label}</div><h1>${title}</h1><p>${message}</p><div class="notice">${note}</div><footer class="state-footer">Route AI Gateway &nbsp; / &nbsp; Персональный доступ</footer></main></body></html>`;
 }
 
 export function renderMissingPortalHtml() {
@@ -28,7 +28,7 @@ export function renderPortalHtml({ clientName, portalToken, apiKey, tokenLimit, 
 
   return `${head(`Персональный доступ — ${clientName}`, { privatePage: true })}<body class="portal-page">
     <main class="portal-main" id="overview">
-      <header class="portal-masthead">${brand()}<span>${icon("lock")}Персональный доступ</span></header>
+      <header class="portal-masthead">${brand()}<div class="masthead-actions"><span class="personal-access-label">${icon("lock")}Персональный доступ</span>${themeControl()}</div></header>
       <section class="page-heading"><h1>${esc(clientName)}</h1><button class="btn" id="refreshBtn">${icon("refresh", "refresh-icon")}Обновить квоту</button></section>
       <div class="access-summary">
         <section class="panel quota-panel metric-accent" aria-labelledby="quotaTitle"><div class="quota-top"><h2 class="eyebrow" id="quotaTitle">${unlimited ? "ИСПОЛЬЗОВАНО ТОКЕНОВ" : "ОСТАТОК ТОКЕНОВ"}</h2><span class="badge ${percentUsed >= 90 ? "is-warning" : ""}" id="quotaStatus"><span class="dot"></span><span id="quotaStatusText">${percentUsed >= 90 ? "Мало токенов" : "Доступ активен"}</span></span></div>

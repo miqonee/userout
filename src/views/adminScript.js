@@ -16,7 +16,7 @@ export function initAdminDashboard({ clients, adminApi, publicUrl }) {
     return [
       'API Key: ' + client.apiKey,
       'Base URL: ' + publicUrl + '/v1',
-      'Личный кабинет (расход и инструкции): ' + client.portalUrl,
+      'Личный кабинет: ' + client.portalUrl,
     ].join('\n');
   }
   async function copyOrSelect(text, area = null) {

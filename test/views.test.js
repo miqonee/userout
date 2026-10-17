@@ -37,11 +37,12 @@ test("client names, model IDs, credentials and login errors are escaped as text"
   assert.ok(!admin.includes(attack));
 });
 
-test("depleted portals contain no key, portal token, endpoint or executable script", () => {
+test("depleted portals contain no credentials or quota polling script", () => {
   for (const input of [{ isDepleted: true }, { usedTokens: portal.tokenLimit }, { usedTokens: portal.tokenLimit + 1 }]) {
     const html = renderPortalHtml({ ...portal, ...input });
     for (const secret of [portal.apiKey, portal.portalToken, portal.publicUrl]) assert.ok(!html.includes(secret));
-    assert.ok(!html.includes("<script>"));
+    assert.ok(!html.includes("const statusUrl"));
+    assert.ok(!html.includes("async function refreshStatus"));
     assert.ok(html.includes("КВОТА ИСЧЕРПАНА"));
   }
 });
@@ -234,7 +235,7 @@ test("admin dashboard includes FunPay auto-delivery export, bonus dialog and cle
   // Telegram copy includes credentials and the personal dashboard link.
   assert.ok(dashboard.includes("'API Key: ' + client.apiKey"));
   assert.ok(dashboard.includes("'Base URL: ' + publicUrl + '/v1'"));
-  assert.ok(dashboard.includes("'Личный кабинет (расход и инструкции): ' + client.portalUrl"));
+  assert.ok(dashboard.includes("'Личный кабинет: ' + client.portalUrl"));
   assert.ok(!dashboard.includes("'Здравствуйте, ' + client.clientName"));
 
   // FunPay dialog

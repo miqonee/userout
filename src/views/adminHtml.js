@@ -1,5 +1,5 @@
 import { initAdminDashboard } from "./adminScript.js";
-import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, sidebar, toast } from "./ui.js";
+import { brand, escapeHtml as esc, formatNum, head, icon, scriptJson, sharedScript, sidebar, toast, themeControl } from "./ui.js";
 import { toUserFacingModel } from "../models.js";
 
 function dialogHeading(title, description) {
@@ -18,7 +18,7 @@ export function renderAdminLoginHtml(error = null, { adminPath = "/manage-consol
         <div class="route-diagram" aria-hidden="true"><span class="diagram-node">${icon("terminal")}</span><span class="diagram-line"></span><span class="diagram-node hub">${icon("key")}</span><span class="diagram-line"></span><span class="diagram-node">${icon("layers")}</span></div>
       </div><div class="login-footer"><span>Route Proxy Gateway</span><span>Панель управления</span></div>
     </section>
-    <main class="login-panel"><div class="login-form-wrap"><h2>Вход</h2>
+    <main class="login-panel"><div class="login-form-wrap"><div class="login-theme">${themeControl()}</div><h2>Вход</h2>
       ${error ? `<div class="notice notice-error" role="alert">${esc(error)}</div>` : ""}
       <form method="POST" action="${esc(adminPath)}/login"><label class="field-label" for="password">Пароль</label><input class="input" type="password" id="password" name="password" autocomplete="current-password" placeholder="Введите пароль" required maxlength="1024" autofocus><button class="btn btn-dark" type="submit">Войти ${icon("arrow")}</button></form>
       <div class="login-note">${icon("lock")}Доступ только для администратора</div>
@@ -51,7 +51,7 @@ export function renderAdminDashboardHtml({ portals = [], availableModels = [], p
   return `${head("Обзор рабочего пространства", { privatePage: true })}<body><div class="app-shell">
     ${sidebar({ adminPath })}
     <main class="main" id="overview">
-      <header class="topbar"><div class="breadcrumb">Рабочее пространство <span>/</span> <strong>Обзор</strong></div><div class="topbar-meta"><span class="tag">AI GATEWAY</span><span class="user-avatar">A</span><a class="icon-button" href="${esc(adminPath)}/logout" aria-label="Выйти" title="Выйти">${icon("logout")}</a></div></header>
+      <header class="topbar"><div class="breadcrumb">Рабочее пространство <span>/</span> <strong>Обзор</strong></div><div class="topbar-meta">${themeControl()}<span class="tag">AI GATEWAY</span><span class="user-avatar">A</span><a class="icon-button" href="${esc(adminPath)}/logout" aria-label="Выйти" title="Выйти">${icon("logout")}</a></div></header>
       <section class="page-heading"><div><h1>Обзор пространства</h1><p class="subtitle">Клиенты, ключи и использование токенов.</p></div><div class="heading-actions"><button class="btn" id="openFunpay">${icon("box")}Автовыдача FunPay</button><button class="btn" id="refreshDashboard">${icon("refresh")}Обновить</button><button class="btn btn-primary" data-open="newKeyDialog">${icon("plus")}Новый ключ</button></div></section>
       <section class="metrics" aria-label="Сводка по клиентам">
         <article class="metric"><div class="metric-label">Всего клиентов ${icon("grid")}</div><div class="metric-number">${formatNum(stats.totalCount)}</div><div class="metric-foot">В вашем пространстве</div></article>

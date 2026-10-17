@@ -11,8 +11,23 @@ const browser = await chromium.launch({ headless: true, ...(process.env.UI_BROWS
 const takeScreenshot = async (page, name) => {
   if (!process.env.UI_SCREENSHOT_DIR) return;
   await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
-  await page.screenshot({ path: join(process.env.UI_SCREENSHOT_DIR, name + '.png'), fullPage: true });
+  await page.screenshot({ path: join(process.env.UI_SCREENSHOT_DIR, name + '.png'), fullPage: true, animations: 'disabled' });
 };
+async function checkThemeControl(page) {
+  const select = page.getByRole('combobox', { name: 'Тема оформления' });
+  assert.equal(await select.isVisible(), true);
+  for (const theme of ['light', 'dark']) {
+    await select.selectOption(theme);
+    await page.emulateMedia({ colorScheme: theme === 'light' ? 'dark' : 'light' });
+    assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), theme);
+    await page.reload();
+    assert.equal(await select.inputValue(), theme);
+    assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), theme);
+  }
+  await select.selectOption('system');
+  await checkTheme(page, 'light');
+  await checkTheme(page, 'dark');
+}
 async function checkTheme(page, theme) {
   await page.emulateMedia({ colorScheme: theme });
   assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), theme);
@@ -50,6 +65,7 @@ try {
     await checkTheme(page, theme);
     await takeScreenshot(page, 'login-' + theme);
   }
+  await checkThemeControl(page);
   await page.locator('#password').fill('route-preview');
   await page.getByRole('button', { name: 'Войти' }).click();
   await page.waitForSelector('.client-row');
@@ -60,10 +76,12 @@ try {
     await takeScreenshot(page, 'admin-' + theme);
   }
   // Theme changes apply to the same open document without a reload.
+  await checkThemeControl(page);
   await checkTheme(page, 'light');
   const portal = await context.newPage();
   for (const [path, name] of [['/p/demo-1', 'portal'], ['/p/demo-4', 'depleted'], ['/p/missing-theme-check', 'missing']]) {
     await portal.goto(new URL(path, address).href);
+    await checkThemeControl(portal);
     for (const theme of ['light', 'dark']) {
       await checkTheme(portal, theme);
       await takeScreenshot(portal, name + '-' + theme);
@@ -73,7 +91,23 @@ try {
     await takeScreenshot(portal, name + '-dark-mobile');
     await portal.setViewportSize({ width: 1440, height: 1050 });
   }
+  // Manual choices propagate to another open page in the same browser.
+  await portal.getByRole('combobox', { name: 'Тема оформления' }).selectOption('dark');
+  await page.waitForFunction(() => getComputedStyle(document.documentElement).colorScheme === 'dark');
+  assert.equal(await page.getByRole('combobox', { name: 'Тема оформления' }).inputValue(), 'dark');
+  await portal.getByRole('combobox', { name: 'Тема оформления' }).selectOption('system');
+  await page.waitForFunction(() => getComputedStyle(document.documentElement).colorScheme === 'light');
   await portal.close();
+  const blockedContext = await browser.newContext({ colorScheme: 'light' });
+  await blockedContext.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked'); } }));
+  const blockedPage = await blockedContext.newPage();
+  const blockedErrors = [];
+  blockedPage.on('pageerror', (err) => blockedErrors.push(err.message));
+  await blockedPage.goto(new URL('/p/demo-1', address).href);
+  await blockedPage.getByRole('combobox', { name: 'Тема оформления' }).selectOption('dark');
+  assert.equal(await blockedPage.locator('html').evaluate((el) => getComputedStyle(el).colorScheme), 'dark');
+  assert.deepEqual(blockedErrors, []);
+  await blockedContext.close();
 
   const row = (id) => page.locator('.client-row[data-id="' + id + '"]');
   assert.equal(await row(6).locator('[data-action="bonus"]').isDisabled(), true);
@@ -86,7 +120,7 @@ try {
   await page.locator('#exportSelected').click();
   const firstInvitation = await page.locator('#funpayTextarea').inputValue();
   assert.equal(firstInvitation.split('\n').length, 1);
-  assert.match(firstInvitation, /^API Key: sk-demo-local-only-1\\nBase URL: http:\/\/127\.0\.0\.1:\d+\/v1\\nЛичный кабинет \(расход и инструкции\): http:\/\/127\.0\.0\.1:\d+\/p\/demo-1$/);
+  assert.match(firstInvitation, /^API Key: sk-demo-local-only-1\\nBase URL: http:\/\/127\.0\.0\.1:\d+\/v1\\nЛичный кабинет: http:\/\/127\.0\.0\.1:\d+\/p\/demo-1$/);
   await page.locator('#funpayDialog [data-close]').last().click();
   await row(1).locator('[data-action="telegram"]').click();
   await page.waitForFunction(() => Boolean(window.copiedText));
@@ -126,7 +160,7 @@ try {
   const fresh = await page.locator('#funpayTextarea').inputValue();
   assert.equal(await page.locator('#funpayTextarea').evaluate((el) => el.scrollLeft), 0);
   assert.equal(fresh.split('\n').length, 3);
-  for (const line of fresh.split('\n')) assert.match(line, /^API Key: sk-demo-.+\\nBase URL: http:\/\/127\.0\.0\.1:\d+\/v1\\nЛичный кабинет \(расход и инструкции\): http:\/\/127\.0\.0\.1:\d+\/p\/[A-Za-z0-9_-]{10}$/);
+  for (const line of fresh.split('\n')) assert.match(line, /^API Key: sk-demo-.+\\nBase URL: http:\/\/127\.0\.0\.1:\d+\/v1\\nЛичный кабинет: http:\/\/127\.0\.0\.1:\d+\/p\/[A-Za-z0-9_-]{10}$/);
   await checkTheme(page, 'dark');
   assert.ok(!fresh.includes('/p/demo-'));
   assert.equal(await page.locator('.client-row').count(), 6, 'Do not reload before export closes');
