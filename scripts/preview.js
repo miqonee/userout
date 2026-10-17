@@ -42,6 +42,7 @@ const upstream = createServer(async (request, response) => {
     for await (const part of request) body += part;
     const update = JSON.parse(body);
     if (typeof update.usedTokens === "number") keys.get(id).usedTokens = Math.max(0, update.usedTokens);
+    if (typeof update.tokenLimit === "number") keys.get(id).tokenLimit = update.tokenLimit;
     return send(200, { key: keys.get(id) });
   }
   if (request.method === "DELETE" && keys.has(id)) { keys.delete(id); return send(200, { success: true }); }

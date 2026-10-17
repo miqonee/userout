@@ -176,6 +176,7 @@ class RouterClient {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updateData),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {
@@ -190,6 +191,7 @@ class RouterClient {
   async deleteKey(keyId) {
     const res = await this.authenticatedFetch(`/api/keys/${keyId}`, {
       method: "DELETE",
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok && res.status !== 404) {

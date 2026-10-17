@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "preview": "node scripts/preview.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:ui": "node scripts/check-admin-ui.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",

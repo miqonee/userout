@@ -26,7 +26,7 @@ import { generateRandomClientName } from "./names.js";
 const fastify = Fastify({
   trustProxy: config.trustProxy,
   logger: {
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
+    level: process.env.NODE_ENV === "test" ? "silent" : process.env.NODE_ENV === "production" ? "info" : "debug",
   },
   disableRequestLogging: true,
 });
@@ -295,6 +295,7 @@ fastify.post(adminPath + "/api/keys/batch-create", async (req, reply) => {
       return reply.status(500).send({
         error: `Ошибка при создании ключа в 9router: ${err.message}`,
         createdSoFar: createdPortals,
+        failedCount: 1,
       });
     }
   }
@@ -313,9 +314,11 @@ fastify.post(adminPath + "/api/keys/:id/add-tokens", async (req, reply) => {
   if (!portal) return reply.status(404).send({ error: "Key not found" });
 
   let { addTokens } = req.body || {};
-  addTokens = parseInt(addTokens, 10);
-  if (isNaN(addTokens) || addTokens <= 0) {
+  if (!Number.isSafeInteger(addTokens) || addTokens <= 0 || !Number.isSafeInteger(portal.tokenLimit + addTokens)) {
     return reply.status(400).send({ error: "Укажите положительное количество токенов для начисления." });
+  }
+  if (portal.tokenLimit === 0) {
+    return reply.status(400).send({ error: "У безлимитного ключа нет квоты для начисления бонуса." });
   }
 
   const newLimit = (portal.tokenLimit || 0) + addTokens;
@@ -324,6 +327,7 @@ fastify.post(adminPath + "/api/keys/:id/add-tokens", async (req, reply) => {
     await routerClient.updateKey(portal.keyId, { tokenLimit: newLimit });
   } catch (err) {
     req.log.warn({ err }, `Could not update limit for key ${portal.keyId} in 9router`);
+    return reply.status(502).send({ error: "Шлюз не подтвердил начисление. Лимит не изменён. Попробуйте ещё раз." });
   }
 
   const updated = updatePortalLimit(portal.id, newLimit);
@@ -332,9 +336,40 @@ fastify.post(adminPath + "/api/keys/:id/add-tokens", async (req, reply) => {
     oldLimit: portal.tokenLimit,
     newLimit: updated.tokenLimit,
     addedTokens: addTokens,
+    status: updated.status,
+    usedTokens: updated.cachedUsedTokens,
     clientName: portal.clientName,
     portalUrl: `${config.publicUrl}/p/${encodeURIComponent(portal.portalToken)}`,
   });
+});
+
+// Keep the portal until the upstream confirms revocation. A missing key is
+// already revoked, including retries after an interrupted local deletion.
+async function deleteManagedKey(id) {
+  const portal = getPortalById(id);
+  if (!portal) return;
+  await routerClient.deleteKey(portal.keyId);
+  deletePortalRecord(id);
+}
+
+fastify.post(adminPath + "/api/keys/batch-delete", async (req, reply) => {
+  if (!isAdminAuthenticated(req)) return reply.status(401).send({ error: "Unauthorized" });
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || !ids.length || ids.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+    return reply.status(400).send({ error: "Укажите список ID ключей для удаления." });
+  }
+  const deletedIds = [];
+  const failed = [];
+  for (const id of new Set(ids)) {
+    try {
+      await deleteManagedKey(id);
+      deletedIds.push(id);
+    } catch (err) {
+      req.log.warn({ err, id }, "Could not delete managed key");
+      failed.push({ id, error: "Не удалось подтвердить удаление. Повторите попытку." });
+    }
+  }
+  return reply.send({ deletedIds, failed });
 });
 
 // Admin API: Delete Key
@@ -348,14 +383,12 @@ fastify.delete(adminPath + "/api/keys/:id", async (req, reply) => {
   if (!portal) return reply.status(404).send({ error: "Key not found" });
 
   try {
-    // Delete in 9router
-    await routerClient.deleteKey(portal.keyId);
+    await deleteManagedKey(portal.id);
   } catch (err) {
     req.log.warn({ err }, `Could not delete key ${portal.keyId} in 9router`);
+    return reply.status(502).send({ error: "Шлюз не подтвердил удаление. Ключ сохранён для повторной попытки." });
   }
 
-  // Delete in local DB
-  deletePortalRecord(id);
   return reply.send({ success: true });
 });
 
@@ -384,4 +417,5 @@ const start = async () => {
   }
 };
 
-start();
+export { fastify };
+if (process.env.NODE_ENV !== "test") await start();
